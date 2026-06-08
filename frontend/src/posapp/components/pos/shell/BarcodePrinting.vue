@@ -92,7 +92,7 @@
 						</v-row>
 
 						<v-row dense class="mb-2">
-							<v-col cols="12" md="6">
+							<v-col cols="12" md="4">
 								<v-checkbox
 									v-model="includePrice"
 									:label="__('Include Price')"
@@ -101,10 +101,19 @@
 									color="primary"
 								></v-checkbox>
 							</v-col>
-							<v-col cols="12" md="6">
+							<v-col cols="12" md="4">
 								<v-checkbox
 									v-model="includeBatchSerial"
 									:label="__('Include Batch / Serial')"
+									density="compact"
+									hide-details
+									color="primary"
+								></v-checkbox>
+							</v-col>
+							<v-col cols="12" md="4">
+								<v-checkbox
+									v-model="encodeQtyInBarcode"
+									:label="__('Encode Quantity in Barcode')"
 									density="compact"
 									hide-details
 									color="primary"
@@ -323,6 +332,7 @@ export default {
 			gridRows: 7,
 			includePrice: true,
 			includeBatchSerial: false,
+			encodeQtyInBarcode: true,
 			editingQtyValue: "",
 			pos_profile: null,
 			addItemDialog: false,
@@ -968,7 +978,12 @@ export default {
 				this.isScaleBarcodePayload(item) ||
 				this.isLikelyWeightUom(defaultUom) ||
 				this.isPotentialScaleTemplate(scannedScaleBarcode || scaleTemplateFromRows || barcode);
-			const initialLabelQty = isScaleBarcode ? 1 : this.normalizeLabelQty(item.qty);
+			const scannedRawBarcode = item._scanned_barcode || item._scanned_scale_barcode || barcode;
+			const matchedBarcodeRow = itemBarcodes.find(
+				(row) => row?.barcode === scannedRawBarcode || row?.barcode === barcode,
+			);
+			const posaBarcodeQty = matchedBarcodeRow?.posa_qty > 0 ? matchedBarcodeRow.posa_qty : null;
+			const initialLabelQty = isScaleBarcode ? 1 : this.normalizeLabelQty(posaBarcodeQty ?? item.qty);
 			const initialScaleGrams = this.normalizeScaleGrams(
 				item.scale_grams ||
 					(item._scale_qty !== undefined && item._scale_qty !== null
@@ -1413,6 +1428,7 @@ export default {
           .barcode-container { margin: 2px 0; width: 100%; display: flex; justify-content: center; flex-grow: 1; align-items: center; overflow: hidden; }
           .barcode-text { font-size: 10px; }
           .price { font-size: 11px; font-weight: bold; margin-top: 2px; }
+          .qty-label { font-size: 11px; font-weight: bold; margin-top: 2px; }
           .batch-serial { font-size: 9px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 95%; }
           img.barcode { max-width: 95%; height: auto; max-height: 100%; object-fit: contain; }
         `;
@@ -1453,12 +1469,13 @@ export default {
               overflow: hidden; 
               padding: 2px 0;
           }
-          .price { 
-              font-size: 11px; 
-              font-weight: bold; 
-              line-height: 1.2; 
+          .price {
+              font-size: 11px;
+              font-weight: bold;
+              line-height: 1.2;
               margin-top: 2px;
           }
+          .qty-label { font-size: 11px; font-weight: bold; line-height: 1.2; margin-top: 2px; }
           .batch-serial { font-size: 9px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 95%; }
           img.barcode { 
               max-width: 95%; 
@@ -1482,8 +1499,13 @@ export default {
 			items.forEach((item) => {
 				const labelsCount = this.normalizeLabelQty(item.qty);
 				const safeItemName = this.escapeHtml(item.item_name || item.item_code || "");
-				const safeBarcode = this.escapeHtml(item.barcode || "");
-				for (let i = 0; i < labelsCount; i++) {
+				const encodedBarcode =
+					this.encodeQtyInBarcode && labelsCount > 1
+						? `${item.barcode}*${labelsCount}`
+						: item.barcode || "";
+				const safeBarcode = this.escapeHtml(encodedBarcode);
+				const printCount = this.encodeQtyInBarcode && labelsCount > 1 ? 1 : labelsCount;
+				for (let i = 0; i < printCount; i++) {
 					let batchSerialHtml = "";
 					if (this.includeBatchSerial) {
 						let text = "";
@@ -1506,6 +1528,11 @@ export default {
 						priceHtml = `<div class="price">Price: ${this.escapeHtml(this.formatCurrency(item.price))}</div>`;
 					}
 
+					const qtyHtml =
+						this.encodeQtyInBarcode && labelsCount > 1
+							? `<div class="qty-label">Qty: ${labelsCount}</div>`
+							: "";
+
 					html += `
             <div class="label">
               <div class="item-name">${safeItemName}</div>
@@ -1520,6 +1547,7 @@ export default {
                       jsbarcode-displayValue="true"
                       jsbarcode-fontSize="12">
               </div>
+              ${qtyHtml}
               ${batchSerialHtml}
               ${priceHtml}
             </div>
