@@ -8190,5 +8190,15 @@
 		"unique": 1,
 		"insert_after": "reference_no",
 		"name": "Payment Entry-posa_client_request_id"
+	},
+	{
+		"doctype": "Custom Field",
+		"name": "Item Barcode-posa_qty",
+		"dt": "Item Barcode",
+		"fieldname": "posa_qty",
+		"label": "Quantity",
+		"fieldtype": "Float",
+		"insert_after": "uom",
+		"description": "When scanned in POS, item is added with this quantity instead of 1"
 	}
 ]

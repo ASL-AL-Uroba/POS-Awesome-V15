@@ -535,6 +535,15 @@ export function useScanProcessor(context: ScanProcessorContext) {
 				return barcodeMatch || item.item_code === searchCode;
 			});
 		}
+		if (foundItem && qtyFromBarcode === null) {
+			const matchedBarcode =
+				Array.isArray(foundItem.item_barcode) &&
+				foundItem.item_barcode.find((b: any) => b.barcode === searchCode);
+			if (matchedBarcode && matchedBarcode.posa_qty > 0) {
+				qtyFromBarcode = matchedBarcode.posa_qty;
+			}
+		}
+		
 		logScanFlow("Parsed scan code", {
 			scannedCode,
 			searchCode,
