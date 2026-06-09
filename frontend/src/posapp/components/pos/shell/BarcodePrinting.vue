@@ -131,6 +131,7 @@
 							class="elevation-1 border rounded"
 							:items-per-page="-1"
 							hide-default-footer
+							:no-data-text="__('No data available')"
 						>
 							<template v-slot:item.uom="{ item }">
 								<v-select
