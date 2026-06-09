@@ -388,4 +388,18 @@ fixtures = [
             ]
         ],
     },
+    {
+        "doctype": "Translation",
+        "filters": [
+            ["language", "=", "ar"],
+            [
+                "source_text",
+                "in",
+                [
+                    "Payment methods refreshed. Please review before proceeding.",
+                    "Item Price added for {0} in Price List {1}",
+                ],
+            ],
+        ],
+    },
 ]

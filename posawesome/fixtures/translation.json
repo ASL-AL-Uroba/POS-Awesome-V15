@@ -1,0 +1,28 @@
+[
+ {
+  "context": null,
+  "contributed": 0,
+  "contribution_docname": null,
+  "contribution_status": "",
+  "docstatus": 0,
+  "doctype": "Translation",
+  "language": "ar",
+  "modified": "2026-06-09 15:04:15.163317",
+  "name": "33oeevb1u2",
+  "source_text": "Payment methods refreshed. Please review before proceeding.",
+  "translated_text": "تم تحديث طرق الدفع. يرجى المراجعة قبل المتابعة."
+ },
+ {
+  "context": null,
+  "contributed": 0,
+  "contribution_docname": null,
+  "contribution_status": "",
+  "docstatus": 0,
+  "doctype": "Translation",
+  "language": "ar",
+  "modified": "2026-06-09 15:04:15.405898",
+  "name": "33qfq7eojd",
+  "source_text": "Item Price added for {0} in Price List {1}",
+  "translated_text": "تمت إضافة سعر الصنف {0} في قائمة الأسعار {1}"
+ }
+]
