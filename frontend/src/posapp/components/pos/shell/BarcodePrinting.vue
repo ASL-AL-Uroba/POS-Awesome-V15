@@ -1252,7 +1252,7 @@ export default {
 				return;
 			}
 
-			const style = this.getPrintStyles();
+			const style = this.getPrintStyles(true);
 			const content = this.generatePrintContent(itemsToPrint);
 			this.logDebug("printLabels:render", {
 				items_to_print: itemsToPrint.length,
@@ -1322,8 +1322,22 @@ export default {
 			let pdfUnit = "mm";
 			let orientation = "portrait";
 
+			// Compute total number of label divs that will be rendered (needed for canvas height)
+			let totalLabelDivs = 0;
 			if (!isA4) {
 				pdfFormat = [size.width, size.height];
+				// jsPDF swaps [w,h] to enforce portrait when w>h, so match orientation to actual dimensions
+				orientation = size.width >= size.height ? "landscape" : "portrait";
+				totalLabelDivs = itemsToPrint.reduce((sum, item) => {
+					const labelsCount = this.normalizeLabelQty(item.qty);
+					return sum + (this.encodeQtyInBarcode && labelsCount > 1 ? 1 : labelsCount);
+				}, 0);
+			}
+
+			// For non-A4, cap html2canvas height to exactly N*labelHeight pixels to prevent a blank trailing page
+			const html2canvasOpts = { scale: 2, useCORS: true };
+			if (!isA4) {
+				html2canvasOpts.height = Math.floor(totalLabelDivs * size.height * (96 / 25.4));
 			}
 
 			const jsPdfOptions = {
@@ -1363,7 +1377,7 @@ export default {
                       margin:       0,
                       filename:     'barcodes.pdf',
                       image:        { type: 'jpeg', quality: 0.98 },
-                      html2canvas:  { scale: 2, useCORS: true },
+                      html2canvas:  ${JSON.stringify(html2canvasOpts)},
                       jsPDF:        ${JSON.stringify(jsPdfOptions)}
                     };
 
@@ -1382,9 +1396,9 @@ export default {
 				items_to_print: itemsToPrint.length,
 			});
 		},
-		getPrintStyles() {
+		getPrintStyles(forPrint = false) {
 			const size = this.parseLabelSize();
-			this.logDebug("getPrintStyles", { size });
+			this.logDebug("getPrintStyles", { size, forPrint });
 			if (size.type === "A4") {
 				const { cols, rows } = size;
 				// Calculate approximate height based on A4 height (297mm) and margins
@@ -1435,8 +1449,14 @@ export default {
         `;
 			} else {
 				// Thermal printer styles
+				// For direct browser print: omit custom @page size to avoid Chrome auto-rotating
+				// content when width > height conflicts with the PDF driver's portrait default.
+				// jsPDF controls page dimensions for the PDF download path so @page is irrelevant there.
+				const pageRule = forPrint
+					? `@page { margin: 0; }`
+					: `@page { size: ${size.width}mm ${size.height}mm; margin: 0; }`;
 				return `
-          @page { size: ${size.width}mm ${size.height}mm; margin: 0; }
+          ${pageRule}
           body { font-family: sans-serif; margin: 0; padding: 0; width: ${size.width}mm; height: ${size.height}mm; overflow: hidden; }
           .label {
             width: ${size.width}mm;
@@ -1446,7 +1466,6 @@ export default {
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            page-break-after: always;
             overflow: hidden;
             box-sizing: border-box;
             padding: 1mm;
