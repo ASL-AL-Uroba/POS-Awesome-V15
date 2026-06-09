@@ -62,8 +62,8 @@
 					hide-details
 					clearable
 					v-model="internalCurrencyFilter"
-					:items="['ALL', ...currencies]"
-					label="Filter by Currency"
+					:items="[{ title: __('ALL'), value: 'ALL' }, ...currencies.map(c => ({ title: c, value: c }))]"
+					:label="__('Filter by Currency')"
 					class="pos-themed-input"
 				></v-select>
 			</v-col>
