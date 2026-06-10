@@ -381,6 +381,11 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 		const diff = unref(diff_payment) || 0;
 		const writeOffAmount = getEffectiveWriteOffAmount(doc, profile, diff);
 
+		// 0. Validate customer is selected
+		if (!doc.customer) {
+			throw new Error(__("Please select Customer first"));
+		}
+
 		// 1. Ensure return payments are negative
 		if (doc.is_return) {
 			ensureReturnPaymentsAreNegative();

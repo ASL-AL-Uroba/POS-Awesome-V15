@@ -384,8 +384,23 @@ fixtures = [
                 [
                     "POS Profile-posa_allow_multi_currency",
                     "POS Profile-posa_decimal_precision",
+                    "Item Barcode-posa_qty"
                 ],
             ]
+        ],
+    },
+    {
+        "doctype": "Translation",
+        "filters": [
+            ["language", "=", "ar"],
+            [
+                "source_text",
+                "in",
+                [
+                    "Payment methods refreshed. Please review before proceeding.",
+                    "Item Price added for {0} in Price List {1}",
+                ],
+            ],
         ],
     },
 ]

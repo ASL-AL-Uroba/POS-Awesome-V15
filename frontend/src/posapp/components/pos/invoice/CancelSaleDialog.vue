@@ -10,8 +10,7 @@
 				<span class="text-h5 text-primary">{{ __("Cancel Sale ?") }}</span>
 			</v-card-title>
 			<v-card-text>
-				This would cancel and delete the current sale. To save it as Draft, click the "Save and Clear"
-				instead.
+				{{ __("This would cancel and delete the current sale. To save it as Draft, click Save and Clear instead.") }}
 			</v-card-text>
 			<v-card-actions>
 				<v-spacer></v-spacer>

@@ -2,6 +2,7 @@ import { computed, unref, type Ref } from "vue";
 import { formatUtils } from "../../../format";
 
 declare const window: any;
+declare const __: (_text: string, _args?: any[]) => string;
 
 export interface PaymentCalculationOptions {
 	invoiceDoc: Ref<any>;
@@ -197,12 +198,12 @@ export function usePaymentCalculations(options: PaymentCalculationOptions) {
 		const currency = doc ? doc.currency : "";
 		if (doc?.is_return) {
 			return diff_payment.value < 0
-				? `Remaining Refund (${currency})`
-				: `Change (${currency})`;
+				? __("Remaining Refund ({0})", [currency])
+				: __("Change ({0})", [currency]);
 		}
 		return diff_payment.value > 0
-			? `To Be Paid (${currency})`
-			: `Change (${currency})`;
+			? __("To Be Paid ({0})", [currency])
+			: __("Change ({0})", [currency]);
 	});
 
 	const total_payments_display = computed(() => {

@@ -1,6 +1,7 @@
 import { createVuetify } from "vuetify";
 import * as components from "vuetify/components";
 import * as directives from "vuetify/directives";
+import { ar } from "vuetify/locale";
 import "@mdi/font/css/materialdesignicons.css";
 
 const THEME_STORAGE_KEY = "posawesome_theme_preference";
@@ -141,11 +142,16 @@ const darkTheme = {
 	},
 };
 
+const isRtl = typeof frappe !== "undefined" && frappe.utils ? frappe.utils.is_rtl() : false;
+const vuetifyLocale = isRtl ? "ar" : "en";
+
 export default createVuetify({
 	components,
 	directives,
 	locale: {
-		rtl: typeof frappe !== "undefined" && frappe.utils ? frappe.utils.is_rtl() : false,
+		locale: vuetifyLocale,
+		rtl: { ar: true },
+		messages: { ar },
 	},
 	theme: {
 		defaultTheme: resolveInitialTheme(),

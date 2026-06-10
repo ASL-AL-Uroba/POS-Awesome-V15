@@ -2,9 +2,14 @@
  {
   "desk_access": 1,
   "disabled": 0,
+  "docstatus": 0,
   "doctype": "Role",
+  "home_page": null,
   "is_custom": 1,
+  "modified": "2026-06-09 14:59:08.500353",
   "name": "POS Awesome Supervisor",
-  "role_name": "POS Awesome Supervisor"
+  "restrict_to_domain": null,
+  "role_name": "POS Awesome Supervisor",
+  "two_factor_auth": 0
  }
 ]
