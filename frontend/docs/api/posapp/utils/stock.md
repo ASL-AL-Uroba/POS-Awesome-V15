@@ -12,7 +12,7 @@
 
 > **formatNegativeStockWarning**(`itemName`, `availableQty`, `requestedQty`): `string`
 
-Defined in: [posapp/utils/stock.ts:55](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/e4702e6bee780293b93a2d5206ed9c11c5542d45/frontend/src/posapp/utils/stock.ts#L55)
+Defined in: [posapp/utils/stock.ts:55](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/105d2e6570081e4bda0d84d8b2331d57f10cb273/frontend/src/posapp/utils/stock.ts#L55)
 
 Formats a negative stock warning message.
 
@@ -48,7 +48,7 @@ Formatted translated string
 
 > **formatStockShortageError**(`itemName`, `availableQty`, `requestedQty`): `string`
 
-Defined in: [posapp/utils/stock.ts:36](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/e4702e6bee780293b93a2d5206ed9c11c5542d45/frontend/src/posapp/utils/stock.ts#L36)
+Defined in: [posapp/utils/stock.ts:36](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/105d2e6570081e4bda0d84d8b2331d57f10cb273/frontend/src/posapp/utils/stock.ts#L36)
 
 Formats a stock shortage error message.
 
@@ -84,7 +84,7 @@ Formatted translated string
 
 > **parseBooleanSetting**(`value`): `boolean`
 
-Defined in: [posapp/utils/stock.ts:12](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/e4702e6bee780293b93a2d5206ed9c11c5542d45/frontend/src/posapp/utils/stock.ts#L12)
+Defined in: [posapp/utils/stock.ts:12](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/105d2e6570081e4bda0d84d8b2331d57f10cb273/frontend/src/posapp/utils/stock.ts#L12)
 
 Parses a value into a boolean based on standard Frappe/POS settings.
 
