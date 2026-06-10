@@ -1252,37 +1252,100 @@ export default {
 				return;
 			}
 
+			const size = this.parseLabelSize();
 			const style = this.getPrintStyles();
 			const content = this.generatePrintContent(itemsToPrint);
 			this.logDebug("printLabels:render", {
 				items_to_print: itemsToPrint.length,
+				size,
 				style_length: style?.length || 0,
 				content_length: content?.length || 0,
 			});
 
-			printWindow.document.write(`
-        <html>
-          <head>
-            <title>Print Barcodes</title>
-            <style>
-              ${style}
-            </style>
-          </head>
-          <body>
-            ${content}
-				<script src="/assets/posawesome/dist/js/libs/JsBarcode.all.min.js"></${"script"}>
-            <script>
-              window.onload = function() {
-                JsBarcode(".barcode").init();
-                setTimeout(() => {
+			if (size.type !== "A4") {
+				// For label sizes: use html2pdf + autoPrint to embed the correct page dimensions
+				// into the PDF, since Chrome's print dialog ignores @page { size } CSS.
+				const totalLabelDivs = itemsToPrint.reduce((sum, item) => {
+					const labelsCount = this.normalizeLabelQty(item.qty);
+					return sum + (this.encodeQtyInBarcode && labelsCount > 1 ? 1 : labelsCount);
+				}, 0);
+				const orientation = size.width >= size.height ? "landscape" : "portrait";
+				const html2canvasOpts = JSON.stringify({
+					scale: 2,
+					useCORS: true,
+					height: Math.floor(totalLabelDivs * size.height * (96 / 25.4)),
+				});
+				const jsPdfOptions = JSON.stringify({
+					unit: "mm",
+					format: [size.width, size.height],
+					orientation,
+				});
+
+				printWindow.document.write(`
+          <html>
+            <head>
+              <title>Print Barcodes</title>
+              <style>${style}</style>
+              <script src="/assets/posawesome/dist/js/libs/html2pdf.bundle.min.js"></${"script"}>
+              <script src="/assets/posawesome/dist/js/libs/JsBarcode.all.min.js"></${"script"}>
+            </head>
+            <body>
+              <div id="print-content">${content}</div>
+              <script>
+                window.onload = function() {
+                  JsBarcode(".barcode").init();
+                  setTimeout(function() {
+                    var element = document.getElementById('print-content');
+                    var opt = {
+                      margin: 0,
+                      image: { type: 'jpeg', quality: 0.98 },
+                      html2canvas: ${html2canvasOpts},
+                      jsPDF: ${jsPdfOptions}
+                    };
+                    html2pdf().set(opt).from(element).toPdf().get('pdf').then(function(pdf) {
+                      pdf.autoPrint();
+                      var blobUrl = pdf.output('bloburl');
+						var iframe = document.createElement('iframe');
+						iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+						iframe.src = blobUrl;
+						document.body.appendChild(iframe);
+						iframe.onload = function () {
+							setTimeout(function () {
+							iframe.contentWindow.focus();
+							iframe.contentWindow.print();
+							}, 200);
+						};
+                    });
+                  }, 800);
+                };
+              </${"script"}>
+            </body>
+          </html>
+        `);
+			} else {
+				// A4: use the browser's native print dialog directly.
+				printWindow.document.write(`
+          <html>
+            <head>
+              <title>Print Barcodes</title>
+              <style>${style}</style>
+            </head>
+            <body>
+              ${content}
+              <script src="/assets/posawesome/dist/js/libs/JsBarcode.all.min.js"></${"script"}>
+              <script>
+                window.onload = function() {
+                  JsBarcode(".barcode").init();
+                  setTimeout(function() {
                     window.print();
                     window.close();
-                }, 500);
-              }
-				</${"script"}>
-          </body>
-        </html>
-      `);
+                  }, 500);
+                };
+              </${"script"}>
+            </body>
+          </html>
+        `);
+			}
 			printWindow.document.close();
 			this.logDebug("printLabels:window-ready", {
 				items_to_print: itemsToPrint.length,
@@ -1322,8 +1385,22 @@ export default {
 			let pdfUnit = "mm";
 			let orientation = "portrait";
 
+			// Compute total number of label divs that will be rendered (needed for canvas height)
+			let totalLabelDivs = 0;
 			if (!isA4) {
 				pdfFormat = [size.width, size.height];
+				// jsPDF swaps [w,h] to enforce portrait when w>h, so match orientation to actual dimensions
+				orientation = size.width >= size.height ? "landscape" : "portrait";
+				totalLabelDivs = itemsToPrint.reduce((sum, item) => {
+					const labelsCount = this.normalizeLabelQty(item.qty);
+					return sum + (this.encodeQtyInBarcode && labelsCount > 1 ? 1 : labelsCount);
+				}, 0);
+			}
+
+			// For non-A4, cap html2canvas height to exactly N*labelHeight pixels to prevent a blank trailing page
+			const html2canvasOpts = { scale: 2, useCORS: true };
+			if (!isA4) {
+				html2canvasOpts.height = Math.floor(totalLabelDivs * size.height * (96 / 25.4));
 			}
 
 			const jsPdfOptions = {
@@ -1363,7 +1440,7 @@ export default {
                       margin:       0,
                       filename:     'barcodes.pdf',
                       image:        { type: 'jpeg', quality: 0.98 },
-                      html2canvas:  { scale: 2, useCORS: true },
+                      html2canvas:  ${JSON.stringify(html2canvasOpts)},
                       jsPDF:        ${JSON.stringify(jsPdfOptions)}
                     };
 
@@ -1382,9 +1459,9 @@ export default {
 				items_to_print: itemsToPrint.length,
 			});
 		},
-		getPrintStyles() {
+		getPrintStyles(forPrint = false) {
 			const size = this.parseLabelSize();
-			this.logDebug("getPrintStyles", { size });
+			this.logDebug("getPrintStyles", { size, forPrint });
 			if (size.type === "A4") {
 				const { cols, rows } = size;
 				// Calculate approximate height based on A4 height (297mm) and margins
@@ -1435,8 +1512,10 @@ export default {
         `;
 			} else {
 				// Thermal printer styles
+				const orientation = size.width >= size.height ? "landscape" : "portrait";
+				const pageRule = `@page { size: ${size.width}mm ${size.height}mm ${orientation}; margin: 0; }`;
 				return `
-          @page { size: ${size.width}mm ${size.height}mm; margin: 0; }
+          ${pageRule}
           body { font-family: sans-serif; margin: 0; padding: 0; width: ${size.width}mm; height: ${size.height}mm; overflow: hidden; }
           .label {
             width: ${size.width}mm;
@@ -1446,7 +1525,6 @@ export default {
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            page-break-after: always;
             overflow: hidden;
             box-sizing: border-box;
             padding: 1mm;
