@@ -79,8 +79,39 @@ describe("usePaymentSubmission", () => {
 		]);
 	});
 
+	it("blocks submission when no customer is selected, before any override prompt", async () => {
+		const requestBelowCostOverride = vi.fn();
+		const invoiceDoc = ref<any>({
+			is_return: 0,
+			items: [{ item_code: "LOW", qty: 1, rate: 9, trade_price: 10 }],
+			payments: [{ mode_of_payment: "Cash", amount: 9, type: "Cash" }],
+			rounded_total: 9,
+			grand_total: 9,
+		});
+		const { validateSubmission } = usePaymentSubmission({
+			invoiceDoc,
+			posProfile: ref({
+				posa_below_cost_action: "POS Supervisor Override",
+			}),
+			stockSettings: ref({}),
+			invoiceType: ref("Invoice"),
+			formatFloat: (value) => Number(value || 0),
+			requestBelowCostOverride,
+			diff_payment: ref(0) as any,
+			isCashback: ref(true),
+		});
+
+		await expect(validateSubmission(true)).rejects.toThrow(
+			/select Customer first/i,
+		);
+		// The guard must run before the below-cost policy, so no supervisor is asked to
+		// approve an override on an invoice that cannot be submitted anyway.
+		expect(requestBelowCostOverride).not.toHaveBeenCalled();
+	});
+
 	it("blocks submission validation when a sale row is below trade price", async () => {
 		const invoiceDoc = ref<any>({
+			customer: "CUST-0001",
 			is_return: 0,
 			items: [
 				{
@@ -117,6 +148,7 @@ describe("usePaymentSubmission", () => {
 	it("allows warning-only below-cost policy and shows a warning", async () => {
 		const toastShow = vi.fn();
 		const invoiceDoc = ref<any>({
+			customer: "CUST-0001",
 			is_return: 0,
 			items: [{ item_code: "LOW", qty: 1, rate: 9, trade_price: 10 }],
 			payments: [{ mode_of_payment: "Cash", amount: 9, type: "Cash" }],
@@ -146,6 +178,7 @@ describe("usePaymentSubmission", () => {
 			reason: "Approved clearance",
 		});
 		const invoiceDoc = ref<any>({
+			customer: "CUST-0001",
 			is_return: 0,
 			items: [{ item_code: "LOW", qty: 1, rate: 9, trade_price: 10 }],
 			payments: [{ mode_of_payment: "Cash", amount: 9, type: "Cash" }],
@@ -1611,6 +1644,7 @@ describe("usePaymentSubmission", () => {
 		const invoiceDoc = ref<any>({
 			name: "ACC-SINV-RETURN-WITHOUT-INVOICE",
 			doctype: "Sales Invoice",
+			customer: "CUST-0001",
 			is_return: 1,
 			items: [{ item_code: "ITEM-1", qty: -1 }],
 			payments: [
@@ -1647,6 +1681,7 @@ describe("usePaymentSubmission", () => {
 		const invoiceDoc = ref<any>({
 			name: "ACC-SINV-RETURN-AGAINST-INVOICE",
 			doctype: "Sales Invoice",
+			customer: "CUST-0001",
 			is_return: 1,
 			return_against: "ACC-SINV-0001",
 			items: [{ item_code: "ITEM-1", qty: -1 }],
