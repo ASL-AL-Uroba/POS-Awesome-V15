@@ -348,6 +348,7 @@ export function useBarcodePrintOutput() {
 	const symbologyOptions = computed(() => ["auto", "EAN13", "EAN8", "UPC", "ITF14", "ITF", "GS1_128", "CODE128", "CODE39", "CODABAR"]);
 	const outputFormat = ref<"html" | "zpl" | "epl">("html");
 	const includeWarehouseLocation = ref(false);
+	const encodeQtyInBarcode = ref(true);
 	const printerDpi = ref<PrinterDPI>(203);
 	const activeDesignerTemplate = ref<string | null>(null);
 	const selectedPrinterProfile = ref<PrinterProfile | null>(null);
@@ -726,15 +727,26 @@ export function useBarcodePrintOutput() {
 		items.forEach((item) => {
 			const itemSym = getItemSymbology(item);
 			const effectiveSym = itemSym === "auto" ? guessSymbologyFromBarcode(item.barcode) : itemSym;
-			const dims = calculateBarcodeDimensions(effectiveSym, ctx, item.barcode?.length);
-			const jsBarcode = getSymbologyForJsBarcode(effectiveSym);
-			const ean128Attr = jsBarcode.ean128 ? ' jsbarcode-ean128="true"' : "";
 			const labelsCount = Math.max(1, Math.round(Number(item.qty) || 1));
+
+			// Quantity-embedded label: print ONE label whose barcode carries `{barcode}*{qty}`
+			// rather than `qty` identical labels. The scanner decodes it back to a quantity
+			// (see useScanProcessor / useItemsSelectorSearch). `*` is not encodable in
+			// EAN13/EAN8/UPC/ITF14/ITF, so the encoded value is always rendered as CODE128 and
+			// sized from its own length — the appended suffix adds modules.
+			const encodeQty = encodeQtyInBarcode.value && labelsCount > 1;
+			const barcodeValue = encodeQty ? `${item.barcode || ""}*${labelsCount}` : item.barcode || "";
+			const renderSym = encodeQty ? "CODE128" : effectiveSym;
+			const renderCount = encodeQty ? 1 : labelsCount;
+
+			const dims = calculateBarcodeDimensions(renderSym, ctx, barcodeValue.length);
+			const jsBarcode = getSymbologyForJsBarcode(renderSym);
+			const ean128Attr = jsBarcode.ean128 ? ' jsbarcode-ean128="true"' : "";
 			const safeItemName = escapeHtml(item.item_name || item.item_code || "");
-			const safeBarcode = escapeHtml(item.barcode || "");
+			const safeBarcode = escapeHtml(barcodeValue);
 			const safeUom = escapeHtml(item.uom || "");
 
-			for (let i = 0; i < labelsCount; i++) {
+			for (let i = 0; i < renderCount; i++) {
 				let batchSerialHtml = "";
 				if (includeBatchSerial.value) {
 					let text = "";
@@ -1198,6 +1210,7 @@ export function useBarcodePrintOutput() {
 		symbologyOptions,
 		outputFormat,
 		includeWarehouseLocation,
+		encodeQtyInBarcode,
 		printerDpi,
 		selectedPrinterProfile,
 		printerProfiles,

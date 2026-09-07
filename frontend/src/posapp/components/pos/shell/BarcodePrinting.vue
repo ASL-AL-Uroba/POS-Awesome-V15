@@ -303,6 +303,15 @@
 									color="primary"
 								></v-checkbox>
 							</v-col>
+							<v-col cols="12" md="4">
+								<v-checkbox
+									v-model="encodeQtyInBarcode"
+									:label="__('Encode Quantity in Barcode')"
+									density="compact"
+									hide-details
+									color="primary"
+								></v-checkbox>
+							</v-col>
 						</v-row>
 
 						<v-alert
@@ -982,6 +991,7 @@ const {
 	includePrice,
 	includeBatchSerial,
 	includeWarehouseLocation,
+	encodeQtyInBarcode,
 	symbology,
 	symbologyOptions,
 	outputFormat,
