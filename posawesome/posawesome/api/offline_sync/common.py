@@ -7,6 +7,26 @@ from posawesome.posawesome.api.utils import get_active_pos_profile
 SYNC_SCHEMA_VERSION = "2026-04-09"
 
 
+def _coerce_offset(value):
+    """Return an unbounded, non-negative pagination offset."""
+
+    try:
+        resolved = int(value if value is not None else 0)
+    except (TypeError, ValueError):
+        resolved = 0
+    return max(0, resolved)
+
+
+def _coerce_limit(value, default, maximum=2000):
+    """Return a bounded, positive page size."""
+
+    try:
+        resolved = int(value if value is not None else default)
+    except (TypeError, ValueError):
+        resolved = default
+    return max(1, min(resolved, maximum))
+
+
 def _normalize_timestamp(value):
     text = str(value or "").strip()
     return text or None

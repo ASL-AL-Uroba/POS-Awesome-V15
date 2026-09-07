@@ -12,4 +12,15 @@ describe("Pos shell drafts placement", () => {
 		expect(source).not.toContain("<ParkedOrdersRail");
 		expect(source).not.toContain('from "../invoice/ParkedOrdersRail.vue"');
 	});
+
+	it("respects the POS Profile cart quantity focus toggle in Counter Grid", () => {
+		const source = readFileSync(
+			resolve("src/posapp/components/pos/shell/Pos.vue"),
+			"utf8",
+		);
+
+		expect(source).toContain(
+			"line && shouldFocusCartQtyAfterItemAdd(posProfile.value)",
+		);
+	});
 });

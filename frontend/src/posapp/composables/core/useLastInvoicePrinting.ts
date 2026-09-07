@@ -5,7 +5,12 @@ import {
 	silentPrint,
 	watchPrintWindow,
 } from "../../plugins/print";
-import { printDocumentViaQz } from "../../services/qzTray";
+import {
+	confirmDocumentPrintFallback,
+	printDocumentViaConfiguredQz,
+	shouldUseConfiguredQzDocumentPrinting,
+	shouldUseRawDocumentPrinting,
+} from "../../services/documentPrint";
 
 declare const frappe: any;
 
@@ -46,7 +51,8 @@ export function useLastInvoicePrinting() {
 		const openInNewTab = parseBooleanSetting(
 			posProfile.posa_open_print_in_new_tab,
 		);
-		const useSilentPrint = parseBooleanSetting(posProfile.posa_silent_print);
+		const useRawPrint = shouldUseRawDocumentPrinting(posProfile);
+		const useConfiguredQzPrint = shouldUseConfiguredQzDocumentPrinting(posProfile);
 		const basePrintUrl = frappe.urllib.get_base_url() + "/printview";
 
 		let url =
@@ -80,7 +86,7 @@ export function useLastInvoicePrinting() {
 			},
 		};
 
-		if (openInNewTab) {
+		if (openInNewTab && !useRawPrint) {
 			let newTabUrl =
 				basePrintUrl +
 				"?doctype=" +
@@ -128,21 +134,24 @@ export function useLastInvoicePrinting() {
 			return;
 		}
 
-		if (useSilentPrint) {
+		if (useConfiguredQzPrint) {
 			try {
-				await printDocumentViaQz({
+				await printDocumentViaConfiguredQz({
 					doctype,
 					name: lastInvoiceId,
+					profile: posProfile,
 					printFormat: pf || "Standard",
 					letterhead: letter_head || null,
 					noLetterhead: letter_head ? "0" : "1",
 				});
 				return;
 			} catch (error) {
-				console.warn("QZ Tray print failed, falling back to browser print", error);
+				console.warn("QZ Tray print failed", error);
+				if (confirmDocumentPrintFallback(error, { raw: useRawPrint })) {
+					silentPrint(url, printOptions);
+				}
+				return;
 			}
-			silentPrint(url, printOptions);
-			return;
 		}
 
 		const printWindow = window.open(url, "Print");

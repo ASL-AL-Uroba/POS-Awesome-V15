@@ -1,6 +1,10 @@
 <template>
 	<!-- Main Invoice Wrapper -->
-	<div class="pa-0 invoice-shell">
+	<div
+		class="pa-0 invoice-shell"
+		:class="{ 'invoice-shell--counter-grid': isCounterGridPresentation }"
+		:data-testid="isCounterGridPresentation ? 'counter-grid-invoice' : 'classic-invoice'"
+	>
 		<!-- Cancel Sale Confirmation Dialog -->
 		<CancelSaleDialog v-model="cancel_dialog" @confirm="cancel_invoice" />
 
@@ -8,15 +12,16 @@
 		<v-card
 			ref="invoiceCard"
 			:style="{
-				height: invoiceHeight || 'var(--container-height)',
-				maxHeight: invoiceHeight || 'var(--container-height)',
-				resize: canResizeInvoicePanel() ? 'vertical' : 'none',
-				overflow: 'auto',
+				height: isCounterGridPresentation ? 'auto' : invoiceHeight || 'var(--container-height)',
+				maxHeight: isCounterGridPresentation ? 'none' : invoiceHeight || 'var(--container-height)',
+				resize: !isCounterGridPresentation && canResizeInvoicePanel() ? 'vertical' : 'none',
+				overflow: isCounterGridPresentation ? 'hidden' : 'auto',
 			}"
 			:class="[
 				'cards my-0 py-0 mt-3 resizable invoice-main-card',
 				'pos-themed-card',
 				{ 'return-mode': isReturnInvoice },
+				{ 'invoice-main-card--counter-grid': isCounterGridPresentation },
 			]"
 			@mouseup="saveInvoiceHeight($refs.invoiceCard)"
 			@touchend="saveInvoiceHeight($refs.invoiceCard)"
@@ -159,7 +164,7 @@
 								@update:itemSearch="itemSearch = $event"
 								@update:selectedColumns="
 									(cols) => {
-										selected_columns = cols;
+										setSelectedColumns(cols);
 										saveColumnPreferences();
 									}
 								"
@@ -185,6 +190,7 @@
 								:calcUom="calc_uom"
 								:setSerialNo="set_serial_no"
 								:setBatchQty="set_batch_qty"
+								:refreshBatchSerialData="refreshBatchSerialData"
 								:validateDueDate="validate_due_date"
 								:removeItem="remove_item"
 								:subtractOne="subtract_one"
@@ -192,7 +198,9 @@
 								:toggleOffer="toggleOffer"
 								:changePriceListRate="change_price_list_rate"
 								:isNegative="isNegative"
+								:counter-grid="isCounterGridPresentation"
 								@update:expanded="handleExpandedUpdate"
+								@batch-serial-changed="handleBatchSerialChanged"
 								@reorder-items="handleItemReorder"
 								@add-item-from-drag="handleItemDrop"
 								@show-drop-feedback="
@@ -200,6 +208,7 @@
 								"
 								@item-dropped="showDropFeedback(false, itemsTableRef)"
 								@view-packed="openPackedItems"
+								@edit-item="openItemQuickEditForItem"
 							/>
 
 							<PackedItemsDialog
@@ -220,8 +229,12 @@
 		<PaymentConfirmationDialog
 			ref="paymentConfirmationDialog"
 			v-model="confirm_payment_dialog"
-			@confirm="resolvePaymentConfirmation(true)"
-			@cancel="resolvePaymentConfirmation(false)"
+			:amount="payment_confirmation_amount"
+			:currency-symbol="currencySymbol(displayCurrency)"
+			:format-currency="(value) => formatCurrency(value, displayCurrency)"
+			:tender-suggestions="payment_confirmation_tender_suggestions"
+			@confirm="resolvePaymentConfirmation($event)"
+			@cancel="resolvePaymentConfirmation(null)"
 		/>
 		<PriceListRateDialog
 			v-model="price_list_rate_dialog_open"
@@ -231,15 +244,26 @@
 			@submit="handlePriceListRateDialogSubmit"
 			@cancel="handlePriceListRateDialogCancel"
 		/>
+		<ItemQuickEditDialog
+			v-model="item_quick_edit_open"
+			:item-code="item_quick_edit_item_code"
+			:pos-profile="pos_profile"
+			:cashier="currentCashier?.user"
+			:is-online="isOnline"
+			@saved="handleItemQuickEditSaved"
+			@after-leave="focusItemSearchField"
+		/>
 
 		<!-- Payment Section -->
 		<InvoiceSummary
 			ref="invoiceSummary"
+			:presentation="presentation"
 			:pos_profile="pos_profile"
 			:total_qty="total_qty"
 			:additional_discount="additional_discount"
 			:additional_discount_percentage="additional_discount_percentage"
 			:total_items_discount_amount="total_items_discount_amount"
+			:grossTotal="Total"
 			:subtotal="subtotal"
 			:displayCurrency="displayCurrency"
 			:formatFloat="formatFloat"
@@ -260,6 +284,8 @@
 			@print-draft="print_draft_invoice"
 			@show-payment="handleShowPaymentRequest"
 			@open-customer-display="handleOpenCustomerDisplayRequest"
+			@open-offers="handleOpenCounterAuxiliary('offers')"
+			@open-coupons="handleOpenCounterAuxiliary('coupons')"
 			@resume-parked-order="resume_parked_order"
 		/>
 	</div>
@@ -278,12 +304,16 @@ import InvoiceItemsActionToolbar from "./invoice/InvoiceItemsActionToolbar.vue";
 import PackedItemsDialog from "./invoice/PackedItemsDialog.vue";
 import PaymentConfirmationDialog from "./payments/PaymentConfirmationDialog.vue";
 import PriceListRateDialog from "./invoice/PriceListRateDialog.vue";
+import ItemQuickEditDialog from "./items/ItemQuickEditDialog.vue";
+import { resolveItemQuickEditCodeFromRows } from "./invoice/itemQuickEditSelection";
 import invoiceItemMethods from "./invoice/invoiceItemMethods";
 import invoiceComputed from "./invoice/invoiceComputed";
 import invoiceWatchers from "./invoice/invoiceWatchers";
 import shortcutMethods from "./invoice/invoiceShortcuts";
 import { useInvoiceStore } from "../../stores/invoiceStore.js";
+import { useItemsStore } from "../../stores/itemsStore";
 import { useCustomersStore } from "../../stores/customersStore.js";
+import { useEmployeeStore } from "../../stores/employeeStore";
 import { useToastStore } from "../../stores/toastStore.js";
 import { useUIStore } from "../../stores/uiStore.js";
 import { storeToRefs } from "pinia";
@@ -291,6 +321,7 @@ import stockCoordinator from "../../utils/stockCoordinator";
 import { getCurrentInstance, ref } from "vue";
 import { save_and_clear_invoice as saveAndClearInvoiceAction } from "./invoice_utils/actions";
 import { fetchDraftInvoices } from "../../utils/draftInvoices";
+import { getQuickCashTenderSuggestions } from "../../utils/cashTender";
 
 // Composables
 import { useOnlineStatus } from "../../composables/core/useOnlineStatus";
@@ -302,6 +333,11 @@ import { useInvoicePrinting } from "../../composables/pos/invoice/useInvoicePrin
 import { useInvoiceStock } from "../../composables/pos/invoice/useInvoiceStock";
 import { usePaymentPrinting } from "../../composables/pos/payments/usePaymentPrinting";
 import {
+	buildInvoicePdfUrl,
+	resolveInvoiceDoctype,
+	shouldDownloadPdfForShareError,
+} from "../../utils/invoiceSharing";
+import {
 	createInvoiceShortcutListeners,
 	registerInvoiceShortcutListener,
 	unregisterInvoiceShortcutListener,
@@ -310,16 +346,25 @@ import {
 export default {
 	name: "POSInvoice",
 	mixins: [format],
+	props: {
+		presentation: {
+			type: String,
+			default: "classic",
+		},
+	},
 	setup() {
 		const instance = getCurrentInstance();
 		const uiStore = useUIStore();
 		const invoiceStore = useInvoiceStore();
+		const itemsStore = useItemsStore();
 		const customersStore = useCustomersStore();
+		const employeeStore = useEmployeeStore();
 		const toastStore = useToastStore();
 		const { isOnline } = useOnlineStatus();
 
 		const { activeView, posProfile: livePosProfile } = storeToRefs(uiStore);
 		const { selectedCustomer, refreshToken: customerRefreshToken } = storeToRefs(customersStore);
+		const { currentCashier } = storeToRefs(employeeStore);
 		const {
 			items,
 			packedItems: packed_items,
@@ -360,7 +405,10 @@ export default {
 			isOnline,
 			toastStore,
 			invoiceStore,
+			itemsStore,
+			employeeStore,
 			customersStore,
+			currentCashier,
 			selectedCustomer,
 			customerRefreshToken,
 			invoiceType,
@@ -377,6 +425,7 @@ export default {
 	},
 	data() {
 		return {
+			is_sharing: false,
 			pos_profile: "",
 			pos_opening_shift: "",
 			stock_settings: "",
@@ -416,6 +465,8 @@ export default {
 			price_list_rate_dialog_initial_rate: "",
 			price_list_rate_dialog_item_label: "",
 			price_list_rate_dialog_resolver: null,
+			item_quick_edit_open: false,
+			item_quick_edit_item_code: "",
 		};
 	},
 
@@ -431,8 +482,12 @@ export default {
 		PackedItemsDialog,
 		PaymentConfirmationDialog,
 		PriceListRateDialog,
+		ItemQuickEditDialog,
 	},
 	computed: {
+		isCounterGridPresentation() {
+			return this.presentation === "counter-grid";
+		},
 		items: {
 			get() {
 				return this.invoiceStore.items;
@@ -515,6 +570,17 @@ export default {
 				prorated_discount: prorated,
 			};
 		},
+		payment_confirmation_tender_suggestions() {
+			return getQuickCashTenderSuggestions({
+				amount: this.payment_confirmation_amount,
+				currency: this.displayCurrency || this.selected_currency || this.pos_profile?.currency,
+				posProfile: this.pos_profile,
+				payments:
+					Array.isArray(this.invoice_doc?.payments) && this.invoice_doc.payments.length
+						? this.invoice_doc.payments
+						: this.pos_profile?.payments,
+			});
+		},
 		...invoiceComputed,
 	},
 
@@ -537,12 +603,137 @@ export default {
 		},
 
 		focusItemSearchField() {
+			if (this.isCounterGridPresentation) {
+				return this.focusCounterGridEntry();
+			}
 			this.uiStore.triggerItemSearchFocus();
+		},
+
+		focusCounterGridEntry() {
+			return this.$refs.itemsTableRef?.focusCounterGridEntry?.();
+		},
+
+		clearCounterGridEntry() {
+			return this.$refs.itemsTableRef?.clearCounterGridEntry?.();
+		},
+
+		focusCartItemQty(payload = {}) {
+			const rows = Array.isArray(this.items) ? this.items : [];
+			if (!rows.length) return;
+
+			const requestedItem = payload?.item || payload;
+			const rowId = payload?.rowId || requestedItem?.posa_row_id;
+			const itemCode = payload?.itemCode || requestedItem?.item_code;
+			let index = -1;
+
+			if (rowId) {
+				index = rows.findIndex((row) => row?.posa_row_id === rowId);
+			}
+			if (index < 0 && itemCode) {
+				index = rows.findIndex((row) => row?.item_code === itemCode);
+			}
+			if (index < 0) {
+				index = 0;
+			}
+
+			this.$nextTick(() => {
+				window.setTimeout(() => {
+					const focused = this.$refs.itemsTableRef?.focusItemField?.(index, "qty");
+					if (!focused && index !== 0) {
+						this.$refs.itemsTableRef?.focusItemField?.(0, "qty");
+					}
+				}, 0);
+			});
 		},
 
 		focusAdditionalDiscountField() {
 			this.eventBus?.emit?.("focus_additional_discount");
 			this.$refs.invoiceSummary?.focusAdditionalDiscountField?.();
+		},
+
+		handleOpenCounterAuxiliary(view) {
+			if (!this.isCounterGridPresentation || !["offers", "coupons"].includes(view)) {
+				return;
+			}
+			this.uiStore.setActiveView(view);
+		},
+
+		resolveItemQuickEditCode() {
+			return resolveItemQuickEditCodeFromRows(this.$refs.itemsTableRef, this.items);
+		},
+
+		openItemQuickEdit() {
+			this.item_quick_edit_item_code = this.resolveItemQuickEditCode();
+			this.item_quick_edit_open = true;
+		},
+
+		openItemWorkspace() {
+			const opened = this.$refs.itemsTableRef?.openSelectedItemWorkspace?.();
+			if (!opened) {
+				this.toastStore.show({
+					title: __("Select an invoice item first"),
+					color: "warning",
+				});
+				this.focusItemSearchField?.();
+			}
+			return opened;
+		},
+
+		openItemQuickEditForItem(item = {}) {
+			this.item_quick_edit_item_code = item?.item_code || this.resolveItemQuickEditCode();
+			this.item_quick_edit_open = true;
+		},
+
+		handleItemQuickEditSaved(payload = {}) {
+			const updatedItem = payload?.pos_item || payload?.item;
+			if (updatedItem?.item_code) {
+				this.itemsStore?.upsertCatalogItem?.(updatedItem);
+			}
+
+			const masterItem = payload?.item || {};
+			const itemCode = updatedItem?.item_code || masterItem?.item_code;
+			if (!itemCode) {
+				return;
+			}
+
+			const retailPrice =
+				updatedItem?.rate ?? updatedItem?.price_list_rate ?? masterItem?.retail_price ?? null;
+			const rows = Array.isArray(this.items) ? this.items : [];
+			rows.forEach((row) => {
+				if (row?.item_code !== itemCode || !row?.posa_row_id) {
+					return;
+				}
+				this.invoiceStore.updateItemWithTotals(row.posa_row_id, (existing) => {
+					const previousQty = row.qty;
+					const previousDiscountPercentage = row.discount_percentage;
+					const previousDiscountAmount = row.discount_amount;
+					Object.assign(existing, masterItem, updatedItem, {
+						posa_row_id: row.posa_row_id,
+						qty: previousQty,
+						discount_percentage: previousDiscountPercentage,
+						discount_amount: previousDiscountAmount,
+					});
+					if (masterItem.retailmind_non_discountable || updatedItem?.retailmind_non_discountable) {
+						existing.discount_percentage = 0;
+						existing.discount_amount = 0;
+					}
+					const keepManualRate =
+						row._manual_rate_set ||
+						row.posa_is_offer ||
+						row.posa_offer_applied ||
+						row.posa_is_replace;
+					if (!keepManualRate && retailPrice !== null && retailPrice !== undefined) {
+						existing.price_list_rate = Number(retailPrice) || 0;
+						existing.rate = Number(retailPrice) || 0;
+						existing.amount = (Number(existing.qty) || 0) * existing.rate;
+					}
+				});
+			});
+			this.invoiceStore.triggerUpdateTotals?.();
+			this.toastStore.show({
+				title: __("Item updated"),
+				color: "success",
+			});
 		},
 
 		handleStockCoordinatorUpdate(event = {}) {
@@ -571,6 +762,118 @@ export default {
 
 		handleExpandedUpdate(ids) {
 			this.expanded = Array.isArray(ids) ? ids.slice(-1) : [];
+		},
+
+		handleBatchSerialChanged(item) {
+			if (this._mergeIndexCache) {
+				this._mergeIndexCache.signature = -1;
+				this._mergeIndexCache.lastItems = null;
+				this._mergeIndexCache.lastOrder = null;
+			}
+			this.invoiceStore?.recalculateTotals?.();
+			this.triggerBackgroundFlush?.();
+			this.$forceUpdate();
+			this.toastStore.show({
+				title: __("Batch and serial selection updated"),
+				message: item?.item_name || item?.item_code || "",
+				color: "success",
+			});
+		},
+
+		async refreshBatchSerialData(item) {
+			if (!item) return item;
+			await this.update_items_details([item]);
+			if (
+				item.has_batch_no &&
+				item.batch_no &&
+				Array.isArray(item.batch_no_data) &&
+				item.batch_no_data.length > 0
+			) {
+				this.set_batch_qty(item, item.batch_no, false);
+			}
+			this.$forceUpdate();
+			return item;
+		},
+
+		async share_last_invoice() {
+			if (this.is_sharing) {
+				return;
+			}
+			this.is_sharing = true;
+			this.eventBus.emit("show_message", {
+				title: __("Preparing invoice for sharing..."),
+				color: "info",
+			});
+			try {
+				const profile_name = this.pos_profile?.name;
+				if (!profile_name) {
+					throw new Error(__("POS Profile is not available."));
+				}
+				const doctype = resolveInvoiceDoctype(this.pos_profile);
+				const result = await frappe.call({
+					method: "frappe.client.get_list",
+					args: {
+						doctype,
+						filters: { pos_profile: profile_name, docstatus: 1 },
+						fields: ["name"],
+						order_by: "creation desc",
+						limit_page_length: 1,
+					},
+				});
+				if (!result.message || result.message.length === 0) {
+					throw new Error(__("No submitted invoices found for this profile."));
+				}
+				const invoice_name = result.message[0].name;
+				const format =
+					this.pos_profile.print_format_for_online || this.pos_profile.print_format || "Standard";
+				const pdf_url = buildInvoicePdfUrl({ doctype, name: invoice_name, format });
+				const response = await fetch(pdf_url, {
+					method: "GET",
+					headers: { "X-Frappe-CSRF-Token": frappe.csrf_token },
+				});
+				if (!response.ok) {
+					throw new Error(__("Failed to download invoice. Status: {0}", [response.status]));
+				}
+				const blob = await response.blob();
+				const file = new File([blob], `${invoice_name}.pdf`, { type: "application/pdf" });
+				const canShare =
+					navigator.share && navigator.canShare && navigator.canShare({ files: [file] });
+				if (canShare) {
+					try {
+						await navigator.share({
+							title: __("Sales Invoice"),
+							text: __("Invoice No: {0}", [invoice_name]),
+							files: [file],
+						});
+					} catch (shareError) {
+						// User dismissed the native share sheet: fall back to download.
+						if (shouldDownloadPdfForShareError(shareError)) {
+							this.download_pdf_blob(blob, invoice_name);
+						}
+					}
+				} else {
+					// Web Share API (with files) unavailable: download instead.
+					this.download_pdf_blob(blob, invoice_name);
+				}
+			} catch (error) {
+				this.eventBus.emit("show_message", {
+					title: error.message || __("Failed to share invoice"),
+					color: "error",
+				});
+			} finally {
+				this.is_sharing = false;
+			}
+		},
+
+		download_pdf_blob(blob, invoice_name) {
+			const url = window.URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = `${invoice_name}.pdf`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			window.URL.revokeObjectURL(url);
 		},
 
 		applyReturnDiscountProration(options = {}) {
@@ -753,8 +1056,13 @@ export default {
 				console.error("Error refreshing parked orders:", error);
 			}
 		},
-		handleClearInvoice() {
+		handleClearInvoice(options = {}) {
 			this.clear_invoice();
+			if (options.resetCurrency && typeof this.reset_currency_to_default === "function") {
+				this.reset_currency_to_default().catch((error) => {
+					console.error("Unable to reset invoice currency:", error);
+				});
+			}
 			this.uiStore.triggerItemSearchFocus();
 		},
 		handleLoadInvoice(data) {
@@ -830,6 +1138,24 @@ export default {
 			this.invoiceType = "Return";
 			this.invoiceTypes = ["Return"];
 			this.invoice_doc.is_return = 1;
+			// Cap on cash refundable for this return. The backend
+			// (get_invoice_for_return) computes it authoritatively as
+			// grand_total - outstanding - returns-already-issued; use that value.
+			// Covers every entry point that loads a return (returns dialog + invoice
+			// management). Falls back to grand - outstanding only if neither the
+			// carried value nor the backend field is present (e.g. older payload).
+			{
+				const od = data.invoice_doc || {};
+				const rd = data.return_doc || {};
+				let refundable =
+					od.posa_refundable_amount != null
+						? od.posa_refundable_amount
+						: rd.posa_refundable_amount != null
+							? rd.posa_refundable_amount
+							: (rd.grand_total || 0) - (rd.outstanding_amount || 0);
+				refundable = this.flt(refundable, this.currency_precision);
+				this.invoice_doc.posa_refundable_amount = refundable > 0 ? refundable : 0;
+			}
 			if (Array.isArray(this.invoice_doc.payments)) {
 				this.invoice_doc.payments.forEach((payment) => {
 					const amount = this.flt(payment.amount || 0, this.currency_precision);
@@ -1040,6 +1366,8 @@ export default {
 			update_invoice_coupons: this.handleUpdateInvoiceCoupons,
 			set_all_items: this.handleSetAllItems,
 			load_return_invoice: this.handleLoadReturnInvoice,
+			share_last_invoice: this.share_last_invoice,
+			focus_cart_item_qty: this.focusCartItemQty,
 			set_new_line: this.handleSetNewLine,
 			calc_uom: this.calc_uom,
 			recalculate_return_discount: (payload) => this.applyReturnDiscountProration(payload),
@@ -1150,6 +1478,127 @@ export default {
 	flex: 1 1 auto;
 	min-height: 0;
 	overflow: auto;
+}
+
+.invoice-shell--counter-grid {
+	--counter-rugged-navy: #09253d;
+	--counter-rugged-navy-raised: #174a70;
+	--counter-rugged-blue: #0f70d7;
+	--counter-rugged-cyan: #38bdf8;
+	--counter-rugged-line: var(--pos-outline);
+	--counter-rugged-soft-line: var(--pos-border);
+	--counter-rugged-surface: var(--pos-card-bg);
+	--counter-rugged-muted: var(--pos-surface-muted);
+	height: 100%;
+	width: min(100%, 1560px);
+	margin-inline: auto;
+	overflow: hidden;
+	gap: 8px;
+}
+
+.invoice-shell--counter-grid .invoice-main-card--counter-grid {
+	flex: 1 1 0;
+	height: auto !important;
+	max-height: none !important;
+	min-height: 0;
+	margin-top: 0 !important;
+	border: 0;
+	border-radius: 0;
+	background: var(--pos-surface-muted) !important;
+	box-shadow: none;
+	overflow: hidden !important;
+}
+
+.invoice-shell--counter-grid .dynamic-padding {
+	padding: 8px 10px 6px;
+	gap: 8px;
+	overflow: hidden;
+}
+
+.invoice-shell--counter-grid .invoice-sections {
+	gap: 8px;
+	overflow: hidden;
+}
+
+.invoice-shell--counter-grid .invoice-top-grid,
+.invoice-shell--counter-grid .invoice-meta-grid {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px;
+}
+
+.invoice-shell--counter-grid .invoice-section-card {
+	border: 1px solid var(--counter-rugged-line);
+	border-radius: 3px;
+	background: var(--counter-rugged-surface) !important;
+	box-shadow: 0 1px 3px rgba(9, 37, 61, 0.14);
+}
+
+.invoice-shell--counter-grid .invoice-section-heading {
+	display: block;
+	padding: 9px 14px;
+	border-bottom: 1px solid var(--counter-rugged-cyan);
+	background: var(--counter-rugged-navy);
+}
+
+.invoice-shell--counter-grid .invoice-section-heading__title {
+	color: #ffffff;
+	font-size: 0.88rem;
+	font-weight: 800;
+	text-transform: uppercase;
+}
+
+.invoice-shell--counter-grid .invoice-top-grid .invoice-section-heading,
+.invoice-shell--counter-grid .invoice-meta-grid .invoice-section-heading {
+	display: none;
+}
+
+.invoice-shell--counter-grid .invoice-items-card {
+	flex: 1 1 auto;
+	min-height: 0;
+	padding-bottom: 0;
+	border: 2px solid var(--counter-rugged-navy);
+	box-shadow: 0 3px 8px rgba(9, 37, 61, 0.22);
+	overflow: hidden;
+}
+
+.invoice-shell--counter-grid .items-table-wrapper {
+	flex: 1 1 auto;
+	min-height: 0;
+	margin-top: 0;
+	overflow: hidden;
+}
+
+.invoice-shell--counter-grid :deep(.items-table-wrapper .posa-items-table-container) {
+	flex: 1 1 auto;
+	min-height: 0;
+	height: 100% !important;
+	max-height: 100% !important;
+	overflow: auto !important;
+}
+
+.invoice-shell--counter-grid :deep(.items-table-wrapper .column-selector-container) {
+	position: static;
+	min-height: 50px;
+	margin: 0;
+	padding: 6px 10px;
+	border-bottom: 2px solid var(--counter-rugged-cyan);
+	border-radius: 0;
+	background: var(--counter-rugged-navy) !important;
+}
+
+.invoice-shell--counter-grid :deep(.item-search-field .v-field) {
+	border: 1px solid #b8c7d2;
+	border-radius: 3px;
+	background: var(--pos-invoice-bg) !important;
+	box-shadow: inset 0 1px 2px rgba(9, 37, 61, 0.12);
+}
+
+.invoice-shell--counter-grid :deep(.column-selector-btn) {
+	min-height: 36px;
+	border: 1px solid var(--counter-rugged-cyan);
+	border-radius: 3px !important;
+	background: #123b5c !important;
+	color: #ffffff !important;
 }
 
 @media (max-width: 1099px) {

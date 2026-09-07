@@ -9,16 +9,30 @@ describe("DefaultLayout bootstrap warning presentation", () => {
 			"utf8",
 		);
 
-		expect(source).toContain(':bootstrap-warning-active="visibleBootstrapWarningActive"');
-		expect(source).toContain(':bootstrap-warning-tooltip="visibleBootstrapWarningTooltip"');
-		expect(source).toContain(':bootstrap-capabilities="visibleBootstrapCapabilitySummaries"');
+		expect(source).toContain(
+			':bootstrap-warning-active="visibleBootstrapWarningActive"',
+		);
+		expect(source).toContain(
+			':bootstrap-warning-tooltip="visibleBootstrapWarningTooltip"',
+		);
+		expect(source).toContain(
+			':bootstrap-capabilities="visibleBootstrapCapabilitySummaries"',
+		);
 		expect(source).toContain("shouldLiftBootstrapWarningStartupGate");
+		expect(source).toContain("isOfflineSaleModeConfirmed");
+		expect(source).toContain(
+			"offlineSaleModeConfirmed: offlineSaleModeConfirmed.value",
+		);
+		expect(source).toContain("resolveOfflineQueueReadiness");
+		expect(source).toContain("continuing the online POS bootstrap");
 		expect(source).toContain("initialBootstrapSyncSettled");
 		expect(source).toContain("<v-snackbar");
 		expect(source).toContain('v-model="bootstrapSnackbarVisible"');
 		expect(source).toContain('location="top center"');
 		expect(source).toContain("Settings > Offline & Sync");
-		expect(source).toContain("Refresh Offline Data or Rebuild Offline Data");
+		expect(source).toContain(
+			"Refresh Offline Data or Rebuild Offline Data",
+		);
 		expect(source).not.toContain("<v-alert");
 	});
 });

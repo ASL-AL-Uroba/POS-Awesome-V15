@@ -106,6 +106,7 @@
 					:day-rows="paymentDayRows"
 					:day-max="paymentDayMax"
 					:format-money="formatMoney"
+					:format-money-in-currency="formatMoneyInCurrency"
 					:format-quantity="formatQuantity"
 					:format-date="formatDate"
 					:format-percent="formatPercent"
@@ -1348,6 +1349,7 @@ const lastUpdatedLabel = computed(() => {
 
 const {
 	formatMoney,
+	formatMoneyInCurrency,
 	formatQuantity,
 	formatSignedQuantity,
 	formatDate,

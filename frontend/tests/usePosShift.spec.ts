@@ -10,6 +10,7 @@ const offlineState = vi.hoisted(() => ({
 
 vi.mock("../src/offline/index", () => ({
 	initPromise: Promise.resolve(),
+	startupInitPromise: Promise.resolve(),
 	checkDbHealth: vi.fn(),
 	getOpeningStorage: vi.fn(() => offlineState.openingStorage),
 	setOpeningStorage: vi.fn((value) => {

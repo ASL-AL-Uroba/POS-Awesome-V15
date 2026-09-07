@@ -32,7 +32,9 @@ describe("useItemsSelectorSearch", () => {
 					item_code: "ITEM-001",
 					item_name: "Item 001",
 					stock_uom: "Nos",
-					item_barcode: [{ barcode: "BOX-001", uom: "Box", posa_uom: "Nos" }],
+					item_barcode: [
+						{ barcode: "BOX-001", uom: "Box", posa_uom: "Nos" },
+					],
 				},
 			],
 			flags: {},
@@ -86,7 +88,31 @@ describe("useItemsSelectorSearch", () => {
 		expect(selectHighlightedItem).not.toHaveBeenCalled();
 	});
 
-	it("prioritizes search over highlighted selection when enter is pressed in limit search mode", async () => {
+	it("routes an exact barcode resolved by the shared index through the scan pipeline", async () => {
+		const scannerInput = createScannerInput();
+		const resolveItemByBarcode = vi.fn(() => ({ item_code: "ITEM-001" }));
+		const vm = {
+			first_search: "BOX-001",
+			search_input: "BOX-001",
+			search: "",
+			search_from_scanner: false,
+			isBackgroundLoading: false,
+		};
+
+		const api = useItemsSelectorSearch({
+			getVM: () => vm,
+			scannerInput,
+			resolveItemByBarcode,
+		});
+
+		await api._performSearch();
+
+		expect(resolveItemByBarcode).toHaveBeenCalledWith("BOX-001");
+		expect(scannerInput.onBarcodeScanned).toHaveBeenCalledWith("BOX-001");
+		expect(vm.search).toBe("");
+	});
+
+	it("selects the highlighted item when enter is pressed in limit search mode", async () => {
 		const searchItems = vi.fn().mockResolvedValue([]);
 		const selectHighlightedItem = vi.fn();
 		const preventDefault = vi.fn();
@@ -116,8 +142,8 @@ describe("useItemsSelectorSearch", () => {
 		await Promise.resolve();
 
 		expect(preventDefault).toHaveBeenCalled();
-		expect(searchItems).toHaveBeenCalledWith("abcd");
-		expect(selectHighlightedItem).not.toHaveBeenCalled();
+		expect(searchItems).not.toHaveBeenCalled();
+		expect(selectHighlightedItem).toHaveBeenCalledTimes(1);
 	});
 
 	it("selects the highlighted item when enter is pressed with a highlighted ref index", () => {
@@ -146,6 +172,35 @@ describe("useItemsSelectorSearch", () => {
 
 		expect(preventDefault).toHaveBeenCalled();
 		expect(selectHighlightedItem).toHaveBeenCalledTimes(1);
+	});
+
+	it("preserves Shift+Enter as an explicit Qty-focus selection intent", () => {
+		const selectHighlightedItem = vi.fn();
+		const preventDefault = vi.fn();
+		const vm = {
+			first_search: "abcd",
+			search_input: "abcd",
+			pos_profile: { posa_use_limit_search: 1 },
+			itemSelection: {
+				highlightedIndex: { value: 0 },
+				selectHighlightedItem,
+			},
+		};
+		const api = useItemsSelectorSearch({
+			getVM: () => vm,
+			scannerInput: createScannerInput(),
+			itemSelection: vm.itemSelection,
+		});
+
+		api.onEnter({
+			preventDefault,
+			shiftKey: true,
+		} as unknown as KeyboardEvent);
+
+		expect(preventDefault).toHaveBeenCalled();
+		expect(selectHighlightedItem).toHaveBeenCalledWith({
+			postAddFocus: "qty",
+		});
 	});
 });
 

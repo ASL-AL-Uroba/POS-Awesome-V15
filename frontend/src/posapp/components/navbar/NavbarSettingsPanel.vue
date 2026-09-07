@@ -208,7 +208,7 @@ const emit = defineEmits(["update:modelValue", "select-action"]);
 const __ = (text, args = []) => {
 	if (window.__) {
 		const nextArgs = Array.isArray(args) ? args : [args];
-		return window.__(text, ...nextArgs);
+		return window.__(text, nextArgs);
 	}
 	return text.replace(/\{(\d+)\}/g, (_, index) => `${args[index] ?? ""}`);
 };

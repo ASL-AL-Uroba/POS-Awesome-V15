@@ -152,6 +152,12 @@ function classifyBusinessCode(message: string, explicitCode?: string | null) {
 
 	const normalized = message.toLowerCase();
 	if (
+		normalized.includes("pos terminal is locked") ||
+		normalized.includes("terminal is locked. verify a cashier pin")
+	) {
+		return "TERMINAL_LOCKED";
+	}
+	if (
 		normalized.includes(
 			"document has been modified after you have opened it",
 		) ||
@@ -271,6 +277,21 @@ function normalizeTransportFailure<T>(
 	error: any,
 	requestId: string,
 ): ApiEnvelope<T> {
+	const responsePayload = error?.responseJSON || error?.xhr?.responseJSON;
+	const serverMessage =
+		extractServerMessage(responsePayload) ||
+		normalizeMessage(responsePayload?.message, "");
+	if (
+		serverMessage &&
+		classifyBusinessCode(serverMessage) === "TERMINAL_LOCKED"
+	) {
+		return errorEnvelope<T>(requestId, getServerTime(responsePayload), {
+			code: "TERMINAL_LOCKED",
+			message: serverMessage,
+			retryable: false,
+		});
+	}
+
 	const status =
 		Number(error?.status || error?.httpStatus || error?.xhr?.status || 0) ||
 		null;

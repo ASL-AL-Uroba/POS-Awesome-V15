@@ -35,7 +35,8 @@ export function usePosPaySelection({
 	const total_selected_payments = computed(() => {
 		if (!selected_payments.value.length) return 0;
 		return selected_payments.value.reduce(
-			(acc: number, cur: any) => acc + flt(cur?.unallocated_amount || 0),
+			(acc: number, cur: any) =>
+				acc + flt(cur?.invoice_equivalent ?? cur?.unallocated_amount ?? 0),
 			0,
 		);
 	});
@@ -43,7 +44,7 @@ export function usePosPaySelection({
 	const total_selected_mpesa_payments = computed(() => {
 		if (!selected_mpesa_payments.value.length) return 0;
 		return selected_mpesa_payments.value.reduce(
-			(acc: number, cur: any) => acc + flt(cur?.amount || 0),
+			(acc: number, cur: any) => acc + flt(cur?.invoice_equivalent ?? cur?.amount ?? 0),
 			0,
 		);
 	});
@@ -51,7 +52,7 @@ export function usePosPaySelection({
 	const total_payment_methods = computed(() => {
 		if (!payment_methods.value.length) return 0;
 		return payment_methods.value.reduce((acc: number, cur: any) => {
-			const amount = parseFloat(cur?.amount || 0);
+			const amount = parseFloat(cur?.invoice_equivalent ?? cur?.amount ?? 0);
 			return acc + (isNaN(amount) ? 0 : amount);
 		}, 0);
 	});

@@ -106,6 +106,13 @@ export function usePosPaySubmission({
 			if (!party) {
 				frappe.throw(__("Please select a party"));
 			}
+			if (
+				payment_methods.value.some((row: any) => flt(row.amount) > 0 && row._rate_error) ||
+				selected_payments.value.some((row: any) => row._rate_error) ||
+				selected_mpesa_payments.value.some((row: any) => row._rate_error)
+			) {
+				frappe.throw(__("Resolve all exchange rates before submitting the payment."));
+			}
 
 			const total_payments =
 				total_selected_payments.value +
@@ -159,6 +166,13 @@ export function usePosPaySubmission({
 				.map((m: any) => ({
 					mode_of_payment: m.mode_of_payment,
 					amount: m.amount,
+					payment_currency: m.payment_currency,
+					original_amount: m.amount,
+					invoice_equivalent: m.invoice_equivalent,
+					invoice_exchange_rate: m.invoice_exchange_rate,
+					exchange_rate: m.company_exchange_rate,
+					rate_date: m.rate_date,
+					rate_source: m.rate_source,
 					row_id: m.row_id,
 					bank_account: m.bank_account || null,
 				})),

@@ -60,6 +60,33 @@ describe("api envelope handling", () => {
 		});
 	});
 
+	it("preserves a terminal lock server error as an actionable business code", async () => {
+		(frappe.call as any).mockImplementation(({ error }: any) => {
+			error({
+				status: 403,
+				statusText: "Forbidden",
+				responseJSON: {
+					_server_messages: JSON.stringify([
+						JSON.stringify({
+							message:
+								"This POS terminal is locked. Verify a cashier PIN to continue.",
+						}),
+					]),
+				},
+			});
+		});
+
+		const result = await api.callEnvelope("pos.test.terminal_locked");
+
+		expect(result).toMatchObject({
+			ok: false,
+			error: {
+				code: "TERMINAL_LOCKED",
+				retryable: false,
+			},
+		});
+	});
+
 	it("normalizes business-rule responses into non-retryable envelopes", async () => {
 		(frappe.call as any).mockImplementation(({ callback }: any) => {
 			callback({

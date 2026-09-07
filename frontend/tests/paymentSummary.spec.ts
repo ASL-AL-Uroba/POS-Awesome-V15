@@ -130,4 +130,34 @@ describe("PaymentSummary", () => {
 		expect(wrapper.text()).toContain("Included in settlement");
 		expect(wrapper.find('[data-test="payment-settlement-state"]').exists()).toBe(false);
 	});
+
+	it("shows exact base change when invoice currency rounds the difference to zero", () => {
+		const wrapper = mount(PaymentSummary, {
+			props: {
+				invoice_doc: { currency: "USD", is_return: false },
+				total_payments_display: "0.42",
+				diff_payment_display: "0.00",
+				diff_label: "Change (USD)",
+				diffPayment: 0,
+				change_due: 0,
+				baseSettlement: { difference: -0.05, change: 0.05 },
+				baseCurrency: "PKR",
+				paid_change: 0,
+				credit_change: 0,
+				paid_change_rules: [],
+				currencySymbol: (currency: string) => (currency === "PKR" ? "Rs" : "$"),
+				formatCurrency: (value: number) => Number(value).toFixed(2),
+			},
+			global: {
+				components: { VRow: BoxStub, VCol: BoxStub, VTextField: VTextFieldStub },
+			},
+		});
+
+		expect(wrapper.get('[data-test="payment-base-settlement"]').text()).toContain(
+			"Base Change",
+		);
+		expect(wrapper.get('[data-test="payment-base-settlement"]').text()).toContain(
+			"Rs 0.05",
+		);
+	});
 });

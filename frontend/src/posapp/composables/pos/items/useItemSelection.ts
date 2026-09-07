@@ -16,7 +16,12 @@ type FlyConfig = Record<string, unknown>;
 type ItemSelectionContext = {
 	items: SelectableItem[];
 	displayedItems: SelectableItem[];
-	addItem: ((_item: SelectableItem) => Promise<void> | void) | null;
+	addItem:
+		| ((
+				_item: SelectableItem,
+				_options?: { postAddFocus?: "default" | "qty" },
+		  ) => Promise<void> | void)
+		| null;
 	clearSearch: (() => void) | null;
 	focusItemSearch: (() => void) | null;
 	fly:
@@ -36,6 +41,8 @@ export function useItemSelection() {
 	// State
 	const highlightedIndex = ref(-1);
 	const highlightedItemCode = ref<string | null>(null);
+	const resultNavigationActive = ref(false);
+	const RESULT_PAGE_SIZE = 10;
 
 	// Context (Late Binding)
 	const ctx: ItemSelectionContext = {
@@ -54,10 +61,7 @@ export function useItemSelection() {
 			return;
 		}
 
-		Object.defineProperties(
-			ctx,
-			Object.getOwnPropertyDescriptors(context),
-		);
+		Object.defineProperties(ctx, Object.getOwnPropertyDescriptors(context));
 	}
 
 	// --- Highlighting Logic ---
@@ -65,6 +69,7 @@ export function useItemSelection() {
 	function clearHighlightedItem() {
 		highlightedIndex.value = -1;
 		highlightedItemCode.value = null;
+		resultNavigationActive.value = false;
 	}
 
 	function syncHighlightedItem() {
@@ -118,7 +123,71 @@ export function useItemSelection() {
 
 		highlightedIndex.value = nextIndex;
 		highlightedItemCode.value = nextItem.item_code || null;
+		resultNavigationActive.value = true;
 		// Scroll logic is watcher-driven in the component
+	}
+
+	function highlightItemAt(index: number, activateNavigation = true) {
+		if (
+			!Array.isArray(ctx.displayedItems) ||
+			ctx.displayedItems.length === 0
+		) {
+			clearHighlightedItem();
+			return false;
+		}
+		const nextIndex = Math.max(
+			0,
+			Math.min(index, ctx.displayedItems.length - 1),
+		);
+		const nextItem = ctx.displayedItems[nextIndex];
+		if (!nextItem) return false;
+		highlightedIndex.value = nextIndex;
+		highlightedItemCode.value = nextItem.item_code || null;
+		resultNavigationActive.value = activateNavigation;
+		return true;
+	}
+
+	function activateResultNavigation() {
+		resultNavigationActive.value = true;
+		if (highlightedIndex.value < 0) highlightFirstItem();
+	}
+
+	function isResultNavigationBoundary(direction: number) {
+		if (
+			!Array.isArray(ctx.displayedItems) ||
+			ctx.displayedItems.length === 0 ||
+			(highlightedIndex.value < 0 && !highlightedItemCode.value)
+		) {
+			return false;
+		}
+		const codeIndex = highlightedItemCode.value
+			? findItemIndexByCode(ctx.displayedItems, highlightedItemCode.value)
+			: -1;
+		const activeIndex = codeIndex >= 0 ? codeIndex : highlightedIndex.value;
+		if (activeIndex < 0) return false;
+		return direction > 0
+			? activeIndex >= ctx.displayedItems.length - 1
+			: activeIndex <= 0;
+	}
+
+	function highlightFirstItem() {
+		if (
+			!Array.isArray(ctx.displayedItems) ||
+			ctx.displayedItems.length === 0
+		) {
+			clearHighlightedItem();
+			return false;
+		}
+
+		const firstItem = ctx.displayedItems[0];
+		if (!firstItem) {
+			clearHighlightedItem();
+			return false;
+		}
+
+		highlightedIndex.value = 0;
+		highlightedItemCode.value = firstItem.item_code || null;
+		return true;
 	}
 
 	function resolveHighlightedItem(item: unknown): SelectableItem | unknown {
@@ -147,12 +216,18 @@ export function useItemSelection() {
 	}
 
 	function getItemRowProps(item: unknown) {
-		return isItemHighlighted(item) ? { class: "item-row-highlighted" } : {};
+		const highlighted = isItemHighlighted(item);
+		return {
+			"aria-selected": highlighted ? "true" : "false",
+			class: { "item-row-highlighted": highlighted },
+		};
 	}
 
 	// --- Selection Logic ---
 
-	async function selectHighlightedItem() {
+	async function selectHighlightedItem(
+		options: { postAddFocus?: "default" | "qty" } = {},
+	) {
 		if (
 			!Array.isArray(ctx.displayedItems) ||
 			ctx.displayedItems.length === 0
@@ -171,7 +246,7 @@ export function useItemSelection() {
 		}
 
 		if (ctx.addItem) {
-			await ctx.addItem(item);
+			await ctx.addItem(item, options);
 		}
 
 		clearHighlightedItem();
@@ -224,7 +299,10 @@ export function useItemSelection() {
 		const selectorContainer = document.querySelector(
 			".items-table-container",
 		) as HTMLElement | null;
-		return { target: selectorContainer, cleanup: null as (() => void) | null };
+		return {
+			target: selectorContainer,
+			cleanup: null as (() => void) | null,
+		};
 	}
 
 	function triggerFlyAnimation(event: MouseEvent, isRow = false) {
@@ -294,16 +372,36 @@ export function useItemSelection() {
 			return true; // handled
 		}
 
+		if (key === "PageDown" || key === "PageUp") {
+			event.preventDefault();
+			const direction = key === "PageDown" ? 1 : -1;
+			const startIndex =
+				highlightedIndex.value < 0 ? 0 : highlightedIndex.value;
+			highlightItemAt(startIndex + direction * RESULT_PAGE_SIZE);
+			return true;
+		}
+
+		if (resultNavigationActive.value && (key === "Home" || key === "End")) {
+			event.preventDefault();
+			highlightItemAt(key === "Home" ? 0 : ctx.displayedItems.length - 1);
+			return true;
+		}
+
 		return false; // not handled
 	}
 
 	return {
 		highlightedIndex,
 		highlightedItemCode,
+		resultNavigationActive,
 		registerContext,
 		clearHighlightedItem,
 		syncHighlightedItem,
 		navigateHighlightedItem,
+		highlightFirstItem,
+		highlightItemAt,
+		activateResultNavigation,
+		isResultNavigationBoundary,
 		selectHighlightedItem,
 		isItemHighlighted,
 		getItemRowClass,

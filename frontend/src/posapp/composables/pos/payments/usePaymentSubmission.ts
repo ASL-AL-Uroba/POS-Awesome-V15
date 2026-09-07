@@ -2,14 +2,27 @@ import { unref, type Ref, type ComputedRef } from "vue";
 import invoiceService from "../../../services/invoiceService";
 import { isApiEnvelopeError, unwrapApiResult } from "../../../services/api";
 import {
+	enqueueInvoiceOutboxEntry,
 	saveOfflineInvoice,
 	isOffline,
+	persistInvoiceIntentJournal,
+	removeInvoiceOutboxEntry,
 	updateLocalStock,
 } from "../../../../offline/index";
-import { ensureInvoiceClientRequestId } from "../../../../offline/idempotency";
+import {
+	ensureInvoiceClientRequestId,
+	ensureInvoiceSubmissionIdentity,
+} from "../../../../offline/idempotency";
 import stockCoordinator from "../../../utils/stockCoordinator";
 import { parseBooleanSetting } from "../../../utils/stock";
 import { resolvePosDocumentDoctype } from "../../../utils/posDocumentMode";
+import { toCompanyCurrency } from "../../../utils/erpnextCurrency";
+import { shouldApplyReturnRefundCap } from "../../../utils/paymentInitialization";
+import {
+	findLossRiskItems,
+	getItemCostFloor,
+	resolveSaleFloorPolicy,
+} from "../../../utils/lossPrevention";
 
 declare const frappe: any;
 declare const __: (_str: string, _args?: any[]) => string;
@@ -31,12 +44,17 @@ export interface PaymentSubmissionOptions {
 	diff_payment?: ComputedRef<number>;
 	is_credit_sale?: Ref<boolean>;
 	loyaltyAmount?: Ref<number>;
+	customerInfo?: Ref<any>;
+	requestBelowCostOverride?: (
+		_risks: any[],
+	) => Promise<{ approved: boolean; reason?: string } | null>;
 	stores?: {
 		toastStore?: any;
 		syncStore?: any;
 		customersStore?: any;
 		uiStore?: any;
 		invoiceStore?: any;
+		employeeStore?: any;
 	};
 }
 
@@ -70,6 +88,11 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 		formatFloat,
 		stores,
 	} = options;
+
+	const currencyContext = (doc = unref(invoiceDoc)) => ({
+		...(doc || {}),
+		pos_profile: unref(posProfile),
+	});
 
 	const formatStockErrors = (errors: any[]) => {
 		const settings = unref(stockSettings) || {};
@@ -131,7 +154,11 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 		return true;
 	};
 
-	const validateStockBeforeOnlineSubmission = async (doc: any, profile: any, type: string) => {
+	const validateStockBeforeOnlineSubmission = async (
+		doc: any,
+		profile: any,
+		type: string,
+	) => {
 		if (!shouldValidateStockForSubmission(doc, type)) {
 			return;
 		}
@@ -219,6 +246,41 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 			return null;
 		}
 		return exc.envelope.error.code || null;
+	};
+
+	const TERMINAL_UNLOCK_CANCELLED = Symbol("terminal-unlock-cancelled");
+	const submitAfterTerminalUnlock = async (
+		data: any,
+		submissionDoc: any,
+		type: string,
+		profile: any,
+	) => {
+		while (true) {
+			try {
+				const result = await invoiceService.submitInvoice(
+					data,
+					submissionDoc,
+					type,
+					profile,
+				);
+				unwrapApiResult(result);
+				return result;
+			} catch (error) {
+				if (
+					getSubmissionErrorCode(error) !== "TERMINAL_LOCKED" ||
+					type !== "Invoice" ||
+					!stores?.employeeStore?.requestTerminalUnlock
+				) {
+					throw error;
+				}
+
+				const unlocked =
+					await stores.employeeStore.requestTerminalUnlock();
+				if (!unlocked) {
+					return TERMINAL_UNLOCK_CANCELLED;
+				}
+			}
+		}
 	};
 
 	const buildSubmissionFailureToast = (exc: any, message: string) => {
@@ -366,6 +428,54 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 		}
 	};
 
+	const getLoyaltyRedemptionForSubmission = (doc: any) => {
+		const prec = unref(options.currencyPrecision) || 2;
+		const hasExplicitLoyaltyAmount = Object.prototype.hasOwnProperty.call(
+			options,
+			"loyaltyAmount",
+		);
+		const requestedAmount = formatFloat(
+			hasExplicitLoyaltyAmount ? unref(options.loyaltyAmount) : 0,
+			prec,
+		);
+		const docAmount = formatFloat(doc?.loyalty_amount || 0, prec);
+		const loyaltyAmount = hasExplicitLoyaltyAmount
+			? requestedAmount
+			: docAmount;
+		if (loyaltyAmount <= 0) {
+			return { amount: 0, points: 0 };
+		}
+
+		const existingPoints = Math.trunc(
+			formatFloat(doc?.loyalty_points || 0, prec),
+		);
+		const explicitAmountMatchesDoc =
+			Math.abs(requestedAmount - docAmount) < 1 / 10 ** prec;
+		if (
+			existingPoints > 0 &&
+			(!hasExplicitLoyaltyAmount || explicitAmountMatchesDoc)
+		) {
+			return { amount: loyaltyAmount, points: existingPoints };
+		}
+
+		const info = unref(options.customerInfo) || {};
+		const conversionFactor = Number(info.conversion_factor || 0);
+		if (conversionFactor <= 0) {
+			return { amount: 0, points: 0 };
+		}
+
+		const baseAmount = toCompanyCurrency(
+			currencyContext(doc),
+			loyaltyAmount,
+		);
+		const loyaltyPoints = Math.trunc(baseAmount / conversionFactor);
+		if (loyaltyPoints <= 0) {
+			return { amount: 0, points: 0 };
+		}
+
+		return { amount: loyaltyAmount, points: loyaltyPoints };
+	};
+
 	const validateSubmission = async (payment_received = false) => {
 		const doc = unref(invoiceDoc);
 		const profile = unref(posProfile);
@@ -380,6 +490,134 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 		} = options;
 		const diff = unref(diff_payment) || 0;
 		const writeOffAmount = getEffectiveWriteOffAmount(doc, profile, diff);
+		const invalidPaymentRate = (doc?.payments || []).find(
+			(payment: any) =>
+				Math.abs(Number(payment?.posa_original_amount || 0)) > 0 &&
+				(payment?._posa_rate_error ||
+					!Number(payment?.posa_exchange_rate) ||
+					!Number(payment?.posa_company_exchange_rate)),
+		);
+		const invalidChangeRate = (doc?.posa_change_returns || []).find(
+			(row: any) =>
+				Number(row?.original_amount || 0) > 0 &&
+				(row?._posa_rate_error || !Number(row?.exchange_rate)),
+		);
+		if (invalidPaymentRate || invalidChangeRate) {
+			frappe.throw(__("Resolve all payment and change exchange rates before submitting."));
+		}
+
+		const storeItemsSource = stores?.invoiceStore?.items;
+		const liveCartItems = Array.isArray(storeItemsSource)
+			? storeItemsSource
+			: Array.isArray(storeItemsSource?.value)
+				? storeItemsSource.value
+				: [];
+		const saleFloorPolicy = resolveSaleFloorPolicy(profile);
+		const invoiceGrossAmount = (doc?.items || []).reduce(
+			(total: number, item: any) => {
+				if (item?.is_return || item?.posa_is_replace || Number(item?.qty || 0) <= 0) {
+					return total;
+				}
+				return total + Math.abs(Number(item?.rate || 0) * Number(item?.qty || 0));
+			},
+			0,
+		);
+		const explicitInvoiceDiscount = Math.max(
+			Number(doc?.additional_discount_percentage || 0),
+			0,
+		);
+		const fixedInvoiceDiscountPercentage =
+			explicitInvoiceDiscount <= 0 && invoiceGrossAmount > 0
+				? (Math.max(Number(doc?.discount_amount || 0), 0) / invoiceGrossAmount) * 100
+				: 0;
+		const lossOptions = {
+			minimumMarginPercentage:
+				saleFloorPolicy.minimumMarginPercentage,
+			invoiceDiscountPercentage:
+				explicitInvoiceDiscount || fixedInvoiceDiscountPercentage,
+		};
+		const docLossRiskItems = saleFloorPolicy.enabled
+			? findLossRiskItems(doc?.items || [], lossOptions)
+			: [];
+		const lossRiskItems = docLossRiskItems.length
+			? docLossRiskItems
+			: saleFloorPolicy.enabled
+				? findLossRiskItems(liveCartItems, lossOptions)
+				: [];
+		const missingCostItems = saleFloorPolicy.enabled
+			? (doc?.items || []).filter(
+					(item: any) =>
+						!item?.is_return &&
+						!item?.posa_is_replace &&
+						Number(item?.qty || 0) >= 0 &&
+						!getItemCostFloor(item),
+				)
+			: [];
+		if (
+			missingCostItems.length &&
+			saleFloorPolicy.missingCostAction === "Block"
+		) {
+			const first = missingCostItems[0];
+			throw new Error(
+				__(
+					"Cannot submit invoice because no valid buying floor is available for {0}.",
+					[first.item_name || first.item_code],
+				),
+			);
+		}
+		if (!lossRiskItems.length && doc?.posa_below_cost_override) {
+			doc.posa_below_cost_override = 0;
+			doc.posa_below_cost_override_reason = "";
+			doc.posa_below_cost_override_by = "";
+			doc.posa_below_cost_override_details = "";
+		}
+		if (lossRiskItems.length) {
+			const first = lossRiskItems[0]!;
+			if (saleFloorPolicy.action === "Warning Only") {
+				stores?.toastStore?.show({
+					title: __(
+						"Warning: {0} is selling below the permitted minimum rate {1}.",
+						[
+							first.itemName || first.itemCode,
+							formatFloat(first.costRate, prec),
+						],
+					),
+					color: "warning",
+				});
+			} else if (saleFloorPolicy.action === "POS Supervisor Override") {
+				if (
+					!doc.posa_below_cost_override ||
+					!String(doc.posa_below_cost_override_reason || "").trim()
+				) {
+					const approval = await options.requestBelowCostOverride?.(
+						lossRiskItems,
+					);
+					if (!approval?.approved || !String(approval.reason || "").trim()) {
+						throw new Error(
+							__(
+								"This sale is below the permitted floor and requires a POS supervisor override.",
+							),
+						);
+					}
+					doc.posa_below_cost_override = 1;
+					doc.posa_below_cost_override_reason = String(
+						approval.reason,
+					).trim();
+				}
+			} else {
+			throw new Error(
+				__(
+					"Cannot submit invoice because {0} is selling at {1}, below {2} {3}.",
+					[
+						first.itemName || first.itemCode,
+						formatFloat(first.sellingRate, prec),
+						first.costLabel,
+						formatFloat(first.costRate, prec),
+					],
+				),
+			);
+			}
+		}
 
 		// 0. Validate customer is selected
 		if (!doc.customer) {
@@ -389,6 +627,29 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 		// 1. Ensure return payments are negative
 		if (doc.is_return) {
 			ensureReturnPaymentsAreNegative();
+
+			// Never refund more cash than was actually paid on the original
+			// invoice. Mirrors the backend guard, but blocks here so the cashier
+			// gets one clean message instead of a failed submit round-trip
+			// (which the API layer would surface as a "connection problem").
+			if (shouldApplyReturnRefundCap(doc)) {
+				let refund = 0;
+				(doc.payments || []).forEach((p: any) => {
+					refund += Math.abs(formatFloat(p.amount, prec));
+				});
+				const refundable = formatFloat(
+					doc.posa_refundable_amount,
+					prec,
+				);
+				if (refund > refundable + 0.001) {
+					throw new Error(
+						__(
+							'Cannot refund {0} for this return: only {1} was paid on the original invoice. Turn on "Store as Credit?" to record it as a credit note that reduces the customer\'s balance.',
+							[refund, refundable],
+						),
+					);
+				}
+			}
 		}
 
 		let current_total_payments = 0;
@@ -398,8 +659,9 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 			});
 		}
 		// Add loyalty and credit
-		if (options.loyaltyAmount && unref(options.loyaltyAmount))
-			current_total_payments += unref(options.loyaltyAmount)!;
+		const loyaltyRedemption = getLoyaltyRedemptionForSubmission(doc);
+		if (loyaltyRedemption.amount > 0)
+			current_total_payments += loyaltyRedemption.amount;
 		if (
 			options.redeemedCustomerCredit &&
 			unref(options.redeemedCustomerCredit)
@@ -429,6 +691,7 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 			Boolean(unref(options.is_write_off_change)) &&
 			writeOffLimit !== null &&
 			diff > writeOffLimit + 0.001;
+		const isCreditSale = Boolean(unref(options.is_credit_sale));
 		const hasAnySettlement =
 			effective_total_payments > 0 ||
 			(Array.isArray(doc.payments)
@@ -439,6 +702,14 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 				: false);
 
 		// 2. Validate total payments
+		if (
+			isCreditSale &&
+			!doc.is_return &&
+			!parseBooleanSetting(profile?.posa_allow_credit_sale)
+		) {
+			throw new Error(__("Credit Sale is not enabled in POS Profile"));
+		}
+
 		if (
 			writeOffCappedByLimit &&
 			!profile.posa_allow_partial_payment &&
@@ -453,7 +724,7 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 		}
 
 		if (
-			!unref(options.is_credit_sale) &&
+			!isCreditSale &&
 			!doc.is_return &&
 			!hasAnySettlement &&
 			invoice_total > 0
@@ -462,7 +733,7 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 		}
 
 		// 3. Validate partial payments / cash payments
-		if (!unref(options.is_credit_sale) && !doc.is_return) {
+		if (!isCreditSale && !doc.is_return) {
 			let has_cash_payment = false;
 			let cash_amount = 0;
 			if (doc.payments) {
@@ -591,9 +862,38 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 		return true;
 	};
 
+	const normalizeLoyaltyRedemptionForSubmission = (doc: any) => {
+		if (!doc) {
+			return doc;
+		}
+
+		const clearLoyaltyRedemption = () => {
+			doc.loyalty_amount = 0;
+			doc.redeem_loyalty_points = 0;
+			doc.loyalty_points = 0;
+			return doc;
+		};
+
+		const loyaltyRedemption = getLoyaltyRedemptionForSubmission(doc);
+		if (loyaltyRedemption.amount <= 0 || loyaltyRedemption.points <= 0) {
+			return clearLoyaltyRedemption();
+		}
+
+		const info = unref(options.customerInfo) || {};
+		if (!doc.loyalty_program && info.loyalty_program) {
+			doc.loyalty_program = info.loyalty_program;
+		}
+
+		doc.loyalty_amount = loyaltyRedemption.amount;
+		doc.redeem_loyalty_points = 1;
+		doc.loyalty_points = loyaltyRedemption.points;
+		return doc;
+	};
+
 	const buildSubmissionInvoiceDoc = (doc: any) => {
 		const submissionDoc = JSON.parse(JSON.stringify(doc || {}));
 		ensureInvoiceClientRequestId(submissionDoc);
+		normalizeLoyaltyRedemptionForSubmission(submissionDoc);
 		return submissionDoc;
 	};
 
@@ -627,7 +927,9 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 				const amount = doc.rounded_total || doc.grand_total;
 				default_payment.amount = -Math.abs(amount);
 				if (default_payment.base_amount !== undefined) {
-					default_payment.base_amount = -Math.abs(amount);
+					default_payment.base_amount = -Math.abs(
+						toCompanyCurrency(currencyContext(doc), amount),
+					);
 				}
 			}
 		}
@@ -762,7 +1064,7 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 			ensureInvoiceClientRequestId(doc);
 			doc.write_off_amount = writeOffAmount;
 			doc.base_write_off_amount = formatFloat(
-				writeOffAmount * (doc.conversion_rate || 1),
+				toCompanyCurrency(currencyContext(doc), writeOffAmount),
 				prec,
 			);
 			doc.paid_change = pChange;
@@ -773,6 +1075,8 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 			if (creditChange) creditChange.value = cChange;
 			if (paidChange) paidChange.value = pChange;
 		}
+
+		const submissionDoc = buildSubmissionInvoiceDoc(doc);
 
 		const data = {
 			total_change: changeLimit,
@@ -786,6 +1090,7 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 			gift_card_redemptions: unref(options.giftCardRedemptions) || [],
 			is_cashback: unref(isCashback),
 		};
+		ensureInvoiceSubmissionIdentity(submissionDoc, data);
 		const hasGiftCardRedemption =
 			Array.isArray(data.gift_card_redemptions) &&
 			data.gift_card_redemptions.some(
@@ -805,7 +1110,7 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 				);
 			}
 			try {
-				await saveOfflineInvoice({ data, invoice: doc });
+				await saveOfflineInvoice({ data, invoice: submissionDoc });
 				stores?.syncStore?.updatePendingCount();
 				stores?.toastStore?.show({
 					title: __("Invoice saved offline"),
@@ -838,15 +1143,40 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 		// Online Submission
 		try {
 			await validateStockBeforeOnlineSubmission(doc, profile, type);
-			const submissionDoc = buildSubmissionInvoiceDoc(doc);
-			const message = unwrapApiResult(
-				await invoiceService.submitInvoice(
-					data,
-					submissionDoc,
-					type,
-					profile,
-				),
+			const intent = { data, invoice: submissionDoc };
+			persistInvoiceIntentJournal(intent);
+			const outboxPersistPromise = enqueueInvoiceOutboxEntry(
+				intent,
+			).catch((error) => {
+				console.warn(
+					"Invoice intent remains in the synchronous recovery journal",
+					error,
+				);
+			});
+			if (typeof window !== "undefined") {
+				window.dispatchEvent(
+					new CustomEvent("posa:invoice-submit-dispatched", {
+						detail: {
+							requestId: submissionDoc.posa_client_request_id,
+							timestamp: performance.now(),
+						},
+					}),
+				);
+			}
+			const submissionResult = await submitAfterTerminalUnlock(
+				data,
+				submissionDoc,
+				type,
+				profile,
 			);
+			if (submissionResult === TERMINAL_UNLOCK_CANCELLED) {
+				await outboxPersistPromise;
+				await removeInvoiceOutboxEntry(
+					submissionDoc.posa_client_request_id,
+				);
+				return { cancelled: true, reason: "terminal_locked" };
+			}
+			const message = unwrapApiResult(submissionResult);
 
 			const r = { message };
 
@@ -881,6 +1211,18 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 				docstatus === 1 ||
 				status === 1 ||
 				(docstatus === undefined && status === undefined);
+			if (wasSubmitted) {
+				void outboxPersistPromise.then(() =>
+					removeInvoiceOutboxEntry(
+						submissionDoc.posa_client_request_id,
+					).catch((error) => {
+						console.warn(
+							"Submitted invoice remains in the durable outbox for idempotent reconciliation",
+							error,
+						);
+					}),
+				);
+			}
 			const waitForInvoiceProcessing =
 				Boolean(profile?.posa_allow_submissions_in_background_job) &&
 				!wasSubmitted;
@@ -890,6 +1232,48 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 				(profile?.create_pos_invoice_instead_of_sales_invoice
 					? "POS Invoice"
 					: "Sales Invoice");
+			const submittedDocstatus =
+				docstatus !== undefined
+					? docstatus
+					: status !== undefined
+						? status
+						: 1;
+			const submittedDocument = {
+				...doc,
+				...(typeof r.message === "object" ? r.message : {}),
+				name: responseInvoiceName,
+				doctype: submittedDoctype,
+				docstatus: submittedDocstatus,
+			};
+			if (typeof window !== "undefined") {
+				window.dispatchEvent(
+					new CustomEvent("posa:invoice-submit-response", {
+						detail: {
+							requestId: submissionDoc.posa_client_request_id,
+							invoice: responseInvoiceName,
+							doctype: submittedDoctype,
+							wasSubmitted,
+							docstatus,
+							status,
+							queued: Boolean(r.message?.queued),
+							ledgerState: r.message?.ledger_state,
+							timestamp: performance.now(),
+						},
+					}),
+				);
+			}
+			if (wasSubmitted && typeof window !== "undefined") {
+				window.dispatchEvent(
+					new CustomEvent("posa:invoice-submit-authoritative", {
+						detail: {
+							requestId: submissionDoc.posa_client_request_id,
+							invoice: responseInvoiceName,
+							doctype: submittedDoctype,
+							timestamp: performance.now(),
+						},
+					}),
+				);
+			}
 
 			if (!wasSubmitted && backgroundReason) {
 				const failedInfo = {
@@ -936,7 +1320,7 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 				!waitForInvoiceProcessing &&
 				!hasPostSubmitPaymentWork
 			) {
-				onPrint(doc, {
+				onPrint(submittedDocument, {
 					name: responseInvoiceName,
 					doctype: submittedDoctype,
 					waitForPostSubmitPayments: hasPostSubmitPaymentWork,
@@ -947,12 +1331,14 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 			// Reset local state vars
 			if (customerCreditDict) customerCreditDict.value = [];
 
-			if (stores?.invoiceStore?.invoiceDoc) {
-				stores.invoiceStore.invoiceDoc.docstatus = 1;
-			}
+			stores?.invoiceStore?.mergeInvoiceDoc?.({
+				docstatus: submittedDocstatus,
+				name: responseInvoiceName,
+				doctype: submittedDoctype,
+			});
 
 			if (stores?.uiStore) {
-				stores.uiStore.setLastInvoice(doc.name);
+				stores.uiStore.setLastInvoice(responseInvoiceName);
 			}
 
 			if (!waitForInvoiceProcessing) {
@@ -962,10 +1348,16 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 				});
 				const submittedTitle =
 					submittedDocumentType === "Sales Order"
-						? __("Sales Order {0} is Submitted", [r.message.name])
+						? __("Sales Order {0} is Submitted", [
+								responseInvoiceName,
+							])
 						: submittedDocumentType === "Quotation"
-							? __("Quotation {0} is Submitted", [r.message.name])
-							: __("Invoice {0} is Submitted", [r.message.name]);
+							? __("Quotation {0} is Submitted", [
+									responseInvoiceName,
+								])
+							: __("Invoice {0} is Submitted", [
+									responseInvoiceName,
+								]);
 				stores?.toastStore?.show(
 					hasPostSubmitPaymentWork
 						? {
@@ -992,7 +1384,9 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 				frappe.utils.play_sound("submit");
 			}
 
-			const submittedItems = Array.isArray(doc.items) ? doc.items : [];
+			const submittedItems = Array.isArray(submittedDocument.items)
+				? submittedDocument.items
+				: [];
 			updateLocalStock(submittedItems);
 			stockCoordinator.applyInvoiceConsumption(submittedItems, {
 				source: "invoice",
@@ -1050,6 +1444,9 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 			if (errorCode === "TIMESTAMP_MISMATCH") {
 				const submittedStatus = await fetchSubmittedDocstatus(doc);
 				if (submittedStatus === 1) {
+					await removeInvoiceOutboxEntry(
+						submissionDoc.posa_client_request_id,
+					).catch(() => 0);
 					stores?.toastStore?.show({
 						title: __("Invoice {0} was already submitted", [
 							doc?.name || "",

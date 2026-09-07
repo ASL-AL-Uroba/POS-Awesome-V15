@@ -49,6 +49,20 @@ Follow these steps to install and start using POS Awesome:
 
 For more details, see the [POS Awesome Wiki](https://github.com/yrestom/POS-Awesome/wiki).
 
+### Docker Deployment
+
+POS Awesome is Docker-ready as a Frappe custom-image app. Use
+[`docker/apps.json`](docker/apps.json) for ERPNext/Frappe 16 or
+[`docker/apps.version-15.json`](docker/apps.version-15.json) for ERPNext/Frappe
+15 with Frappe Docker to build an image that contains ERPNext and POS Awesome,
+then install `posawesome` on each site and run migrations. See
+[`docs/DOCKER_DEPLOYMENT.md`](docs/DOCKER_DEPLOYMENT.md) for the full build,
+install, and verification checklist.
+
+Production M-Pesa installations must also follow the
+[`M-Pesa callback security upgrade runbook`](docs/M-PESA_CALLBACK_SECURITY.md)
+before enabling callback processing after an upgrade.
+
 ---
 
 ### Update Instructions
@@ -194,6 +208,45 @@ The **Barcode Printing** module prints item labels directly from POS.
 
 ---
 
+### Raw Printing With QZ Tray
+
+Raw printing sends printer commands directly to the printer through QZ Tray instead of rendering an ERPNext HTML print format in the browser. Use it for fast thermal receipt printing, paper cutting, drawer pulses, and native label-printer commands.
+
+Supported raw print paths:
+
+- **Barcodes / labels**: already supported from the Barcode Printing screen using raw ZPL/EPL output for compatible label printers.
+- **Invoices / POS Invoices**: supported through POS Profile raw receipt printing.
+- **Sales Orders**: supported through the same POS Profile raw receipt printing flow.
+- **Payment Entries / receipts**: supported through the same POS Profile raw receipt printing flow.
+
+#### Setup
+
+1. Install and run **QZ Tray** on each POS terminal.
+2. In POS Awesome, open the QZ Tray setup dialog and connect QZ Tray.
+3. Generate/download the QZ certificate from POS Awesome, trust it in QZ Tray, then restart QZ Tray.
+4. Select the receipt printer and save it as the POS Profile default if this terminal should always use it.
+5. Open **POS Profile** and configure:
+    - `Enable Silent Print`: optional for HTML QZ printing; raw receipt printing can use QZ directly without this option
+    - `QZ Tray Printer Name`: exact printer name detected by QZ Tray
+    - `Use Raw Receipt Printing`: enabled
+    - `Raw Receipt Width`: `42` for most 80mm printers, `32` for most 58mm printers
+
+#### How To Use
+
+- For invoices/orders/payment receipts, submit and print normally from POS. When `Use Raw Receipt Printing` is enabled, POS Awesome sends ESC/POS raw commands through QZ Tray without opening the browser print dialog.
+- For barcode and item labels, open **Barcode Printing**, choose the label output format, and use raw ZPL/EPL for compatible thermal label printers.
+- If raw receipt printing is disabled, POS Awesome keeps using the existing QZ HTML/browser print flow and POS Profile print format behavior.
+- If QZ Tray is unavailable, document printing falls back to the existing browser/silent print path where applicable.
+
+#### Notes
+
+- Raw receipt printing is optimized for thermal receipt printers that support **ESC/POS**.
+- Raw barcode/label printing is optimized for label printers that support **ZPL** or **EPL**.
+- Raw receipts are text-command receipts, so they will not exactly match custom ERPNext HTML/CSS print formats or letterheads.
+- Printed amounts are loaded from the submitted ERPNext document so invoice totals, taxes, discounts, payments, and outstanding amounts stay aligned with the saved invoice/order/payment.
+
+---
+
 ### POS Cash Movement (Journal Entry Based)
 
 Use this feature to post shift-level cash expenses and cash deposits from POS App without touching monolithic accounting flows.
@@ -285,16 +338,19 @@ Notes:
 - **Modular Design**: Separated concerns using Vue 3 Composition API.
 
 #### 🎨 UI/UX & Interface
-#### 🎨 UI/UX & Interface
 
 - **Modern Interface**: User-friendly design using Vue.js and Vuetify, optimized for speed and experience.
+- **Counter Grid**: Optional keyboard-first interface for fast pharmacy and high-volume counter sales.
 - **View Modes**: Toggle between List View (efficient for data entry) and Card View (visual with item images).
 - **Dark Mode & Theming**: Built-in dark mode support with automatic or manual toggle, plus customizable theme options.
+- **Custom Branding**: Use a POS Profile-specific brand name, short name, and logo throughout the POS interface.
 - **RTL Support**: Full support for Right-to-Left languages (Arabic, etc.).
 - **System Status Gadgets**: Real-time monitoring of Server, Database, Cache, and Network status directly from the POS navbar.
+- **Counter Grid Health**: View connectivity, queued sales, pricing readiness, stock confidence, and catalog status from the counter screen.
 - **Fly to Cart Animation**: Visual feedback when adding items to the cart.
 - **Performance**: Optimized for large datasets using virtual scrolling and efficient state management.
-- **Shortcuts**: Extensive keyboard shortcuts for rapid operation.
+- **Keyboard-First Operation**: Navigate product results, cart rows, drafts, item tools, invoice management, and payments without leaving the keyboard.
+- **Direct Cart Editing**: Edit quantity, UOM, rate, and discounts directly in the invoice grid with live total updates.
 - **Multi-Language**: Supports English, Arabic, Portuguese, Spanish, and more.
 
 #### 💸 Transactions & Sales
@@ -309,6 +365,9 @@ Notes:
 - **Change Posting Date**: Ability to change the transaction posting date (backdating) if allowed by profile.
 - **Additional Notes**: Fields for internal notes and authorization codes.
 - **Customer PO**: Capture Customer Purchase Order (PO) number and date.
+- **Submitted Invoice Correction**: Authorized users can preview and submit controlled amendments to eligible POS and Sales Invoices.
+- **Settlement Guidance**: Invoice corrections show whether the cashier must collect or refund a difference and rebalance the primary payment automatically.
+- **Cashier Audit Trail**: The verified cashier is recorded on submitted POS and Sales Invoices.
 
 #### 📦 Inventory & Products
 
@@ -318,6 +377,14 @@ Notes:
 - **UOM Support**: Barcode and pricing support specific to Units of Measure.
 - **Weighted Products**: Support for scale/weighted product barcodes.
 - **Stock Validation**: Configurable stock validation (warn or block) including negative stock handling.
+- **Fast Counter Catalog**: Keep frequently sold products in a fast local catalog with exact code/barcode lookup and IndexedDB/server fallback for long-tail items.
+- **Pharmacy Search**: Search medicine-specific details such as generic, company, pack, rack, and pack/loose availability.
+- **Generic Alternatives**: Suggest in-stock medicines with the same generic using live stock, customer pricing, and profitability-aware ranking.
+- **Positive Stock Filter**: Optionally show only available products in Counter Grid while leaving the standard POS catalog unchanged.
+- **Item Quick Edit**: Authorized users can update item details, barcode, UOM, supplier, retail price, trade price, and POS sale-control flags without leaving POS.
+- **Item Sales History**: Review previous invoice-level sales for an item from the POS workflow.
+- **Controlled Sale Rules**: Warn for controlled items and block locked, non-discountable, or below-buying-price sales in both POS and server validation.
+- **Automatic Batch Allocation**: Apply the POS Profile auto-batch setting, respect stock reserved by the cart, and continue into the next available batch when required.
 - **Offline Stock Verification Skip**: POS Profile option to save offline invoices even when local stock cannot be verified, while keeping server validation during sync.
 - **Barcode Printing**: Build item label batches, print barcodes, export PDF labels, include price/batch/serial data, and generate scale barcodes for weighted items.
 
@@ -331,9 +398,11 @@ Notes:
 - **Employee Payments**: Pay employees through the POS payments workflow.
 - **Payment Auto Allocation**: Automatically allocate newly created payment amounts against selected invoices when enabled.
 - **Payment Reference Tracking**: Capture reference number/date for POS-created payments.
-- **Smart Tender**: "Quick Cash" suggestions based on currency denominations for faster checkout.
+- **Smart Tender / Quick Cash**: "Quick Cash" suggestions based on currency denominations for faster checkout. Entering `0` in the Alt+X / Alt+P quick cash prompt submits a credit sale when `Allow Credit Sale` is enabled on the POS Profile.
+- **Counter Grid Fast Tender**: Select configured payment methods with `Ctrl/Cmd+1-9`, then submit or submit-and-print from the keyboard.
 - **Split Payments**: Accept multiple payment modes for a single transaction.
-- **M-Pesa**: Integrated M-Pesa mobile payment support.
+- **M-Pesa**: Integrated M-Pesa mobile payment support with duplicate/replay and callback transaction validation.
+- **Duplicate-Safe Submission**: Stable request tracking protects online and offline invoice submission from accidental duplicate invoices and multi-terminal retries.
 - **Gift Cards**: Check gift-card balances, redeem gift cards at checkout, and allow supervisors to issue or top up cards.
 - **Loyalty Points**: Earn and redeem Customer Loyalty Points.
 - **Coupons & Offers**: Support for POS Coupons, Promotional Offers, and Referral Codes.
@@ -351,11 +420,21 @@ Notes:
 - **Background Submission**: Enqueue invoice submission to background jobs for faster UI response.
 - **Drafts**: Failed offline submissions are safely saved as Draft documents.
 - **Offline Stock Guard Control**: `Allow Offline Sale Without Stock Verification` can defer stock blocking to online sync when local stock data is incomplete.
+- **Offline Pharmacy Catalog**: Medicine search details and pack/loose projections remain available from the local catalog while offline.
+- **Reliable Catalog Refresh**: Failed or overlapping refreshes keep the latest usable catalog, expose sync time, and support manual refresh/rebuild recovery.
+- **Safe Queue Replay**: Offline invoices preserve their request identity and show pending/error readiness before synchronization.
+- **Slow Startup Recovery**: Slow cashier and product requests provide retry/status feedback while catalog loading can continue safely in the background.
+- **Browser Compatibility**: Production assets include compatibility handling for supported Chrome/Chromium POS terminals and resilient service-worker updates.
 
 #### ⚙️ Configuration & Shift Management
 
 - **Shift Management**: Opening and Closing shifts with cash reconciliation and detailed payment breakdown reports.
+- **POS Interface Selection**: Choose the standard interface or Counter Grid independently for each POS Profile.
+- **Custom POS Branding**: Enable profile-specific brand identity or use the default POS Awesome branding.
 - **Role-Based Supervisor Access**: Supervisor features are granted through the **POS Awesome Supervisor** role on User roles.
+- **Secure Cashier Switching**: Lock the terminal and switch between POS Profile-authorized cashiers using server-validated employee PINs.
+- **Authoritative Terminal State**: Protected POS actions verify the active cashier and terminal lock state with the server.
+- **Cart Quantity Focus**: Configure whether newly added items automatically focus the cart quantity editor.
 - **Cash Movement**: Profile-controlled POS expenses and cash deposits with closing-shift impact.
 - **Customer Balance**: Option to display current customer balance on the main screen.
 - **Address Management**: Manage multiple shipping addresses for customers.
@@ -368,7 +447,8 @@ Notes:
 - `F4` profile switch (currently shows “not available” message).
 - `F6` open new customer form.
 - `F7` open shift details.
-- `F8` POS lock (currently shows “not available” message).
+- `F8` lock the POS and require an authorized cashier PIN to resume.
+- `F12` open Item Quick Edit for the currently selected item when enabled and authorized.
 
 #### Alt + Number
 
@@ -396,12 +476,21 @@ Notes:
 - `Alt + L` load draft invoices.
 - `Alt + M` toggle item selector settings.
 - `Alt + S` save and clear invoice.
+- `Alt/Option + ArrowRight` enter keyboard navigation for the invoice items grid.
+- `Option + 7` on macOS opens Item Quick Edit for the currently selected item.
 
 #### Payments Panel
 
 - `Alt + D` open payments panel.
 - `Alt + X` on invoice it open payments, then submit automatically (prompts if payments are closed). on payments it submit directly.
 - `Alt + P` on invoice it open payments, then submit & print automatically (prompts if payments are closed). on payments it submit directly.
+- In the Alt+X / Alt+P quick cash prompt, entering `0` creates a credit sale only when `Allow Credit Sale` is enabled on the POS Profile; otherwise an error is shown.
+
+#### Counter Grid Payments
+
+- `Ctrl/Cmd + 1` through `Ctrl/Cmd + 9` select the corresponding visible POS Profile payment method.
+- `Ctrl/Cmd + Enter` submit the invoice through the existing payment flow.
+- `Ctrl/Cmd + Shift + Enter` submit and print through the existing payment flow.
 
 ---
 

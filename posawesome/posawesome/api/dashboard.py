@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from datetime import timedelta
 from math import ceil
 from collections import defaultdict
@@ -10,7 +9,13 @@ import frappe
 from frappe import _
 from frappe.utils import add_months, cint, cstr, flt, getdate, now_datetime, nowdate
 
-from .utils import get_active_pos_profile, get_default_warehouse
+from .pos_access import (
+    get_authorized_pos_profile,
+    user_can_manage_pos,
+    user_is_pos_privileged_manager,
+)
+from .terminal_state import get_active_terminal_cashier
+from .utils import get_default_warehouse
 
 INVOICE_SOURCES: tuple[tuple[str, str], ...] = (
     ("Sales Invoice", "Sales Invoice Item"),
@@ -23,15 +28,6 @@ SCOPE_SPECIFIC = "specific"
 DEFAULT_DASHBOARD_SCOPE = SCOPE_ALL
 DEFAULT_LOW_STOCK_THRESHOLD = 10
 
-DASHBOARD_MANAGER_ROLES = {
-    "System Manager",
-    "Accounts Manager",
-    "Sales Manager",
-    "Stock Manager",
-    "POS Manager",
-}
-
-
 def _pick_first_column(doctype: str, candidates: list[str]) -> str | None:
     for fieldname in candidates:
         if frappe.db.has_column(doctype, fieldname):
@@ -39,43 +35,15 @@ def _pick_first_column(doctype: str, candidates: list[str]) -> str | None:
     return None
 
 
-def _resolve_profile(pos_profile: Any) -> dict[str, Any]:
-    profile_name = ""
-
-    if isinstance(pos_profile, dict):
-        profile_name = cstr(pos_profile.get("name")).strip()
-    elif isinstance(pos_profile, str):
-        raw_value = pos_profile.strip()
-        if raw_value:
-            parsed_value: Any = raw_value
-            if raw_value.startswith("{"):
-                try:
-                    parsed_value = json.loads(raw_value)
-                except Exception:
-                    parsed_value = raw_value
-
-            if isinstance(parsed_value, dict):
-                profile_name = cstr(parsed_value.get("name")).strip()
-            elif isinstance(parsed_value, str):
-                profile_name = parsed_value.strip()
-
-    if profile_name:
-        if not frappe.db.exists("POS Profile", profile_name):
-            frappe.throw(_("POS Profile {0} does not exist.").format(profile_name))
-        return frappe.get_cached_doc("POS Profile", profile_name).as_dict()
-
-    active_profile = get_active_pos_profile()
-    if not active_profile:
-        frappe.throw(_("No active POS Profile found for current user."))
-    return active_profile
-
-
-def _check_profile_permission(profile_name: str):
-    if not frappe.has_permission("POS Profile", "read", profile_name):
+def _get_authorized_dashboard_profile(pos_profile: Any) -> tuple[dict[str, Any], str]:
+    profile_doc = get_authorized_pos_profile(pos_profile)
+    cashier = get_active_terminal_cashier(profile_doc.get("name"))
+    if not user_can_manage_pos(cashier):
         frappe.throw(
-            _("You are not permitted to access POS Profile {0}.").format(profile_name),
+            _("A POS supervisor or manager is required for dashboard access."),
             frappe.PermissionError,
         )
+    return profile_doc.as_dict(), cashier
 
 
 def _build_in_filter(column_sql: str, values: list[str]) -> tuple[str, list[str]]:
@@ -147,10 +115,7 @@ def _is_dashboard_enabled(profile_doc: dict[str, Any]) -> bool:
 
 
 def _user_can_view_all_profiles(user: str) -> bool:
-    if user == "Administrator":
-        return True
-    user_roles = set(frappe.get_roles(user))
-    return bool(user_roles & DASHBOARD_MANAGER_ROLES)
+    return user_is_pos_privileged_manager(user)
 
 
 def _normalize_scope(scope: Any, default_scope: str, allow_all_profiles: bool) -> str:
@@ -810,6 +775,7 @@ def _collect_payment_method_report(
     date_to: str,
     limit: int = 20,
 ) -> dict[str, Any]:
+    company_currency = frappe.get_cached_value("Company", company, "default_currency") or ""
     report: dict[str, Any] = {
         "period": {"from": date_from, "to": date_to},
         "totals": {
@@ -835,8 +801,9 @@ def _collect_payment_method_report(
     profile_filter, profile_filter_params = _build_in_filter("inv.pos_profile", profile_names)
     cash_modes = _get_cash_modes(profile_names)
     mode_names: set[str] = set(cash_modes)
-    payment_totals: dict[str, float] = defaultdict(float)
-    payment_invoice_counts: dict[str, int] = defaultdict(int)
+    payment_totals: dict[tuple[str, str], float] = defaultdict(float)
+    payment_tender_totals: dict[tuple[str, str], float] = defaultdict(float)
+    payment_invoice_counts: dict[tuple[str, str], int] = defaultdict(int)
     day_buckets: dict[str, dict[str, Any]] = {}
     totals = report["totals"]
 
@@ -947,16 +914,44 @@ def _collect_payment_method_report(
         if not payment_amount_field:
             continue
 
+        has_tender_currency = frappe.db.has_column(
+            payment_child_doctype, "posa_payment_currency"
+        )
+        has_original_amount = frappe.db.has_column(
+            payment_child_doctype, "posa_original_amount"
+        )
+        tender_currency_expression = (
+            "coalesce(nullif(pay.posa_payment_currency, ''), inv.currency)"
+            if has_tender_currency
+            else "inv.currency"
+        )
+        tender_amount_expression = "coalesce(pay.amount, 0)"
+        if has_tender_currency and has_original_amount:
+            tender_amount_expression = """
+                case
+                    when nullif(pay.posa_payment_currency, '') is not null
+                        then coalesce(pay.posa_original_amount, pay.amount, 0)
+                    else coalesce(pay.amount, 0)
+                end
+            """
+
         payment_rows = frappe.db.sql(
             f"""
             select
                 pay.mode_of_payment as mode_of_payment,
+                {tender_currency_expression} as currency,
                 sum(
                     case
                         when {is_return_expression} = 1 then -abs(coalesce(pay.{payment_amount_field}, 0))
                         else coalesce(pay.{payment_amount_field}, 0)
                     end
                 ) as collected_amount,
+                sum(
+                    case
+                        when {is_return_expression} = 1 then -abs({tender_amount_expression})
+                        else {tender_amount_expression}
+                    end
+                ) as tender_amount,
                 count(distinct pay.parent) as invoice_count
             from `tab{payment_child_doctype}` pay
             inner join `tab{parent_doctype}` inv on inv.name = pay.parent
@@ -965,7 +960,7 @@ def _collect_payment_method_report(
               and inv.posting_date between %s and %s
               {profile_filter}
               {_extra_parent_filter(parent_doctype, "inv")}
-            group by pay.mode_of_payment
+            group by pay.mode_of_payment, {tender_currency_expression}
             """,
             (company, date_from, date_to, *profile_filter_params),
             as_dict=True,
@@ -974,9 +969,12 @@ def _collect_payment_method_report(
             mode_name = cstr(pay_row.get("mode_of_payment")).strip()
             if not mode_name:
                 continue
+            tender_currency = cstr(pay_row.get("currency")).strip() or company_currency
+            payment_key = (mode_name, tender_currency)
             mode_names.add(mode_name)
-            payment_totals[mode_name] += flt(pay_row.get("collected_amount"))
-            payment_invoice_counts[mode_name] += cint(pay_row.get("invoice_count"))
+            payment_totals[payment_key] += flt(pay_row.get("collected_amount"))
+            payment_tender_totals[payment_key] += flt(pay_row.get("tender_amount"))
+            payment_invoice_counts[payment_key] += cint(pay_row.get("invoice_count"))
 
         split_rows = frappe.db.sql(
             f"""
@@ -1012,11 +1010,13 @@ def _collect_payment_method_report(
         "other": {"category": "other", "label": _("Other"), "amount": 0.0, "invoice_count": 0},
     }
     method_rows: list[dict[str, Any]] = []
-    for mode_name in sorted(
-        payment_totals.keys(), key=lambda name: abs(flt(payment_totals.get(name))), reverse=True
+    for payment_key in sorted(
+        payment_totals.keys(), key=lambda key: abs(flt(payment_totals.get(key))), reverse=True
     ):
-        amount = flt(payment_totals.get(mode_name))
-        invoice_count = cint(payment_invoice_counts.get(mode_name))
+        mode_name, tender_currency = payment_key
+        amount = flt(payment_totals.get(payment_key))
+        tender_amount = flt(payment_tender_totals.get(payment_key))
+        invoice_count = cint(payment_invoice_counts.get(payment_key))
         category = _classify_payment_mode(mode_name, mode_type_map.get(mode_name, ""), cash_modes)
         category_entry = category_totals[category]
         category_entry["amount"] = flt(category_entry["amount"]) + amount
@@ -1028,6 +1028,9 @@ def _collect_payment_method_report(
                 "mode_type": mode_type_map.get(mode_name, ""),
                 "category": category,
                 "amount": amount,
+                "company_currency_amount": amount,
+                "currency": tender_currency,
+                "tender_amount": tender_amount,
                 "invoice_count": invoice_count,
             }
         )
@@ -1130,7 +1133,10 @@ def _collect_discount_void_return_report(
             ],
         )
         discount_expression = f"abs(coalesce(inv.{discount_field}, 0))" if discount_field else "0"
-        cashier_field = _pick_first_column(parent_doctype, ["owner", "cashier", "modified_by"])
+        cashier_field = _pick_first_column(
+            parent_doctype,
+            ["posa_cashier", "owner", "cashier", "modified_by"],
+        )
         cashier_expression = f"coalesce(inv.{cashier_field}, '')" if cashier_field else "''"
         is_return_expression = (
             "ifnull(inv.is_return, 0)" if frappe.db.has_column(parent_doctype, "is_return") else "0"
@@ -1727,7 +1733,10 @@ def _collect_staff_cashier_performance_report(
         parent_discount_expression = (
             f"abs(coalesce(inv.{parent_discount_field}, 0))" if parent_discount_field else "0"
         )
-        cashier_field = _pick_first_column(parent_doctype, ["owner", "cashier", "modified_by"])
+        cashier_field = _pick_first_column(
+            parent_doctype,
+            ["posa_cashier", "owner", "cashier", "modified_by"],
+        )
         cashier_expression = f"coalesce(inv.{cashier_field}, '')" if cashier_field else "''"
         is_return_expression = (
             "ifnull(inv.is_return, 0)" if frappe.db.has_column(parent_doctype, "is_return") else "0"
@@ -2310,7 +2319,10 @@ def _collect_branch_location_report(
         is_return_expression = (
             "ifnull(inv.is_return, 0)" if frappe.db.has_column(parent_doctype, "is_return") else "0"
         )
-        cashier_field = _pick_first_column(parent_doctype, ["owner", "cashier", "modified_by"])
+        cashier_field = _pick_first_column(
+            parent_doctype,
+            ["posa_cashier", "owner", "cashier", "modified_by"],
+        )
         cashier_expression = f"coalesce(inv.{cashier_field}, '')" if cashier_field else "''"
 
         sales_rows = frappe.db.sql(
@@ -4600,10 +4612,8 @@ def get_dashboard_data(
     - specific: selected profile_filter.
     """
 
-    user = frappe.session.user
-    current_profile_doc = _resolve_profile(pos_profile)
+    current_profile_doc, user = _get_authorized_dashboard_profile(pos_profile)
     current_profile_name = cstr(current_profile_doc.get("name")).strip()
-    _check_profile_permission(current_profile_name)
 
     profile_scope_enabled = True
     if frappe.db.has_column("POS Profile", "posa_allow_company_dashboard_scope"):

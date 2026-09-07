@@ -45,7 +45,17 @@
     "PricingRule",
     "SyncCoordinatorOptions",
     "LoadItemsOptions",
-    "RuleContext"
+    "RuleContext",
+    "SearchableItem",
+    "PostHydrationTask",
+    "ItemPricesSyncArgs",
+    "PricingRulesSyncArgs",
+    "TerminalEmployeesLoadStatus",
+    "ItemBatchEntry",
+    "ItemBarcodeEntry",
+    "ItemSerialEntry",
+    "AuthoritativeTerminalState",
+    "SearchItemsOptions"
   ],
   "categorizeByGroup": true,
   "groupOrder": ["Functions", "Classes", "Interfaces", "Type Aliases", "Variables"],

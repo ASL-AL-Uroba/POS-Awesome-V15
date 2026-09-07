@@ -172,4 +172,48 @@ describe("invoiceStore invoice type state", () => {
 		expect(store.grossTotal).toBe(40);
 		expect(store.discountTotal).toBe(2);
 	});
+
+	it("uses rounded line amount for gross totals when available", () => {
+		const store = useInvoiceStore();
+		store.addItem({
+			posa_row_id: "row-rounded",
+			item_code: "ITEM-ROUND",
+			qty: 3,
+			rate: 33.3333,
+			amount: 100,
+			discount_amount: 0,
+		});
+
+		expect(store.grossTotal).toBe(100);
+
+		store.recalculateTotals();
+
+		expect(store.grossTotal).toBe(100);
+	});
+
+	it("moves a row to the top without changing its identity or cart totals", () => {
+		const store = useInvoiceStore();
+		store.addItem({
+			posa_row_id: "row-1",
+			item_code: "ITEM-1",
+			qty: 2,
+			rate: 10,
+		});
+		store.addItem({
+			posa_row_id: "row-2",
+			item_code: "ITEM-2",
+			qty: 1,
+			rate: 5,
+		});
+		const storedRow = store.itemsData.get("row-2");
+		const version = store.metadata.changeVersion;
+
+		store.moveRowToTop("row-2");
+
+		expect(store.itemOrder).toEqual(["row-2", "row-1"]);
+		expect(store.itemsData.get("row-2")).toBe(storedRow);
+		expect(store.totalQty).toBe(3);
+		expect(store.grossTotal).toBe(25);
+		expect(store.metadata.changeVersion).toBeGreaterThan(version);
+	});
 });

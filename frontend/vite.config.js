@@ -63,7 +63,8 @@ export default defineConfig({
 		},
 	},
 	build: {
-		target: "esnext",
+		target: "chrome109",
+		cssTarget: "chrome109",
 		modulePreload: false,
 		outDir: "../posawesome/public/dist/js",
 		emptyOutDir: true,

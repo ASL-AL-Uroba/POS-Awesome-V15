@@ -7,6 +7,8 @@ export interface LoadItemsOptions {
 	groupFilter?: string;
 	priceList?: string | null;
 	limit?: number | null;
+	commitToCatalog?: boolean;
+	preserveCatalogOnEmpty?: boolean;
 }
 
 export interface BuildLoadItemsRequestInput {
@@ -98,11 +100,13 @@ export const buildLoadItemsRequest = ({
 	const args: GetItemsArgs = {
 		pos_profile: JSON.stringify(requestProfile),
 		price_list: effectivePriceList,
-		item_group: normalizedGroup !== "ALL" ? normalizedGroup.toLowerCase() : "",
+		item_group:
+			normalizedGroup !== "ALL" ? normalizedGroup.toLowerCase() : "",
 		search_value: searchValue || "",
 		customer,
 		include_image: 1,
-		item_groups: posProfile?.item_groups?.map((g: any) => g.item_group) || [],
+		item_groups:
+			posProfile?.item_groups?.map((g: any) => g.item_group) || [],
 	};
 
 	if (typeof resolvedLimit === "number" && resolvedLimit > 0) {

@@ -158,4 +158,37 @@ describe("useInvoiceItems stock quantity limits", () => {
 		expect(invoiceStore.metadata.changeVersion).toBeGreaterThan(beforeVersion);
 		expect(calcStockQty).toHaveBeenCalledWith(invoiceStore.items[0], 24);
 	});
+
+	it("emits pricing recalculation after a direct quantity edit is committed", async () => {
+		const { bus } = await import("../src/posapp/bus");
+		const { useUIStore } = await import("../src/posapp/stores/uiStore");
+		const { useInvoiceItems } = await import(
+			"../src/posapp/composables/pos/invoice/useInvoiceItems"
+		);
+		const uiStore = useUIStore();
+		uiStore.setPosProfile({
+			name: "POS-1",
+			posa_validate_stock: 0,
+			posa_block_sale_beyond_available_qty: 0,
+		} as any);
+		uiStore.setStockSettings({ allow_negative_stock: 1 } as any);
+		const handler = vi.fn();
+		bus.on("apply_pricing_rules", handler);
+		const invoiceItems = useInvoiceItems(ref("Invoice"));
+		const item = {
+			item_code: "ITEM-MIN-QTY",
+			qty: 1,
+			rate: 100,
+			base_rate: 100,
+			conversion_factor: 1,
+			is_stock_item: 1,
+		};
+
+		invoiceItems.setFormatedQty(item, "qty", null, false, 5);
+
+		expect(item.qty).toBe(5);
+		expect(item.amount).toBe(500);
+		expect(handler).toHaveBeenCalledTimes(1);
+		bus.off("apply_pricing_rules", handler);
+	});
 });

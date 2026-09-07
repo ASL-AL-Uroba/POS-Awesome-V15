@@ -121,8 +121,20 @@ export async function finalizePendingBundleActivation(
 	);
 
 	if (payload?.type === "SW_VERSION_INFO" && payload.version === pendingVersion) {
-		clearPendingBundleActivation();
-		return true;
+		const healthAck: any = await postMessageToActiveServiceWorker(
+			{
+				type: "ACK_CACHE_HEALTH",
+				version: pendingVersion,
+			},
+			timeoutMs,
+		);
+		if (
+			healthAck?.type === "SW_CACHE_HEALTH_ACK" &&
+			healthAck.version === pendingVersion
+		) {
+			clearPendingBundleActivation();
+			return true;
+		}
 	}
 
 	return false;

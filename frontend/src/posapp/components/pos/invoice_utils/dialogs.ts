@@ -37,13 +37,18 @@ export async function show_payment(context: any) {
 			return;
 		}
 
+		if (context.ensure_auto_batch_selection) await context.ensure_auto_batch_selection();
+
 		const isValid = context.validate ? await context.validate() : true;
 
 		if (!isValid) {
 			return;
 		}
 
-		if (context.ensure_auto_batch_selection) await context.ensure_auto_batch_selection();
+		// Capture the transient refundable cap before process_invoice()/backend
+		// reload, which return a doc stripped of non-DocType fields. It is
+		// re-attached below so the payment screen can default a credit return.
+		const carriedRefundableAmount = context.invoice_doc?.posa_refundable_amount;
 
 		let invoice_doc;
 		const paymentDoctype = resolvePosDocumentDoctype({
@@ -145,6 +150,12 @@ export async function show_payment(context: any) {
 		}
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
+		// Re-attach the refundable cap stripped by the backend save/reload so the
+		// payment screen can default an unpaid-invoice return to a credit note.
+		if (carriedRefundableAmount != null && invoice_doc) {
+			invoice_doc.posa_refundable_amount = carriedRefundableAmount;
+		}
+
 		context.eventBus.emit("show_payment", "true");
 		context.eventBus.emit("send_invoice_doc_payment", invoice_doc);
 	} catch (error: any) {
@@ -171,6 +182,11 @@ export async function get_draft_invoices(
 			context.pos_profile,
 			source ?? context.uiStore?.draftSource,
 		);
+		context.uiStore.setDraftSource?.(selectedSource);
+		context.uiStore.setParkedOrders?.([]);
+		context.$refs?.invoiceSummary?.setDraftsLoading?.(true);
+		context.$refs?.invoiceSummary?.openDraftsSurface?.({ focus: false });
+
 		const drafts = await fetchDocumentSourceRecords({
 			source: selectedSource,
 			posOpeningShift: context.pos_opening_shift,
@@ -179,23 +195,24 @@ export async function get_draft_invoices(
 				? "POS Invoice"
 				: "Sales Invoice",
 		});
-		context.uiStore.setDraftSource?.(selectedSource);
 		context.uiStore.setDraftsData?.(drafts);
 		context.uiStore.setParkedOrders?.(drafts);
 		context.uiStore.closeDrafts?.();
+		context.$refs?.invoiceSummary?.setDraftsLoading?.(false);
 
 		if (typeof context.$nextTick === "function") {
 			await context.$nextTick();
 		}
-		if (drafts.length > 0) {
-			context.$refs?.invoiceSummary?.openDraftsSurface?.();
-		}
+		context.$refs?.invoiceSummary?.openDraftsSurface?.({ focus: false });
+		await context.$refs?.invoiceSummary?.focusDraftsSurface?.();
 	} catch (error) {
 		console.error("Error fetching draft invoices:", error);
 		context.toastStore.show({
 			title: __("Unable to fetch documents"),
 			color: "error",
 		});
+	} finally {
+		context.$refs?.invoiceSummary?.setDraftsLoading?.(false);
 	}
 }
 

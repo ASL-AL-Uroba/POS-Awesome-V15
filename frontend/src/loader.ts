@@ -1,3 +1,5 @@
+import "./browserCompatibility";
+
 declare const __BUILD_VERSION__: string;
 import {
 	type BootAssetResult,
@@ -78,13 +80,11 @@ function isDynamicImportFailure(error: unknown): boolean {
 }
 
 async function fetchLatestBuildVersion(): Promise<string | null> {
-	const payload = await fetchBuildMetadata(true);
+	const payload = await fetchBuildMetadata();
 	return extractBuildVersion(payload);
 }
 
-async function fetchBuildMetadata(
-	forceRefresh = false,
-): Promise<BuildMetadata | null> {
+async function fetchBuildMetadata(): Promise<BuildMetadata | null> {
 	try {
 		const response = await fetch(`${VERSION_ENDPOINT}?t=${Date.now()}`, {
 			cache: "no-store",

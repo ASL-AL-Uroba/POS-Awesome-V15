@@ -28,6 +28,7 @@ export function useItemsIntegration(options: IntegrationOptions = {}) {
 	const {
 		items,
 		filteredItems,
+		filteredItemsSearchTerm,
 		itemGroups,
 		isLoading,
 		isBackgroundLoading,
@@ -37,6 +38,7 @@ export function useItemsIntegration(options: IntegrationOptions = {}) {
 		itemsLoaded,
 		searchTerm,
 		itemGroup,
+		lastItemCatalogSyncTime,
 		posProfile,
 		customer,
 		customerPriceList,
@@ -97,7 +99,21 @@ export function useItemsIntegration(options: IntegrationOptions = {}) {
 	};
 
 	const forceReloadItems = async () => {
-		return await itemsStore.refreshItems();
+		return await itemsStore.recoverItemCatalog({
+			reason: "reload_button",
+			preserveSearch: true,
+		});
+	};
+
+	const recoverItemCatalog = async (reason = "manual") => {
+		return await itemsStore.recoverItemCatalog({
+			reason,
+			preserveSearch: true,
+		});
+	};
+
+	const recoverItemCatalogIfUnhealthy = async (reason = "resume") => {
+		return await itemsStore.recoverItemCatalogIfUnhealthy(reason);
 	};
 
 	const refreshModifiedItems = async (
@@ -263,6 +279,7 @@ export function useItemsIntegration(options: IntegrationOptions = {}) {
 		// Store state (reactive)
 		items,
 		filteredItems,
+		filteredItemsSearchTerm,
 		itemGroups,
 		isLoading,
 		isBackgroundLoading,
@@ -272,6 +289,7 @@ export function useItemsIntegration(options: IntegrationOptions = {}) {
 		itemsLoaded,
 		searchTerm,
 		itemGroup,
+		lastItemCatalogSyncTime,
 		posProfile,
 		customer,
 		customerPriceList,
@@ -299,6 +317,8 @@ export function useItemsIntegration(options: IntegrationOptions = {}) {
 		filterByGroup: itemsStore.filterByGroup,
 		updatePriceList: itemsStore.updatePriceList,
 		refreshItems: itemsStore.refreshItems,
+		recoverItemCatalog,
+		recoverItemCatalogIfUnhealthy,
 		appendCachedItemsPage: itemsStore.appendCachedItemsPage,
 		resetCachedItemsForGroup: itemsStore.resetCachedItemsForGroup,
 		backgroundSyncItems: itemsStore.backgroundSyncItems,

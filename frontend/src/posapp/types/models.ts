@@ -113,6 +113,16 @@ export interface Payment {
   default?: boolean;
   currency?: string;
   conversion_rate?: number;
+  /** Currency and amount physically tendered by the customer. */
+  posa_payment_currency?: string;
+  posa_original_amount?: number;
+  /** Explicit payment-to-invoice and payment-to-company multipliers. */
+  posa_exchange_rate?: number;
+  posa_company_exchange_rate?: number;
+  posa_rate_date?: string;
+  posa_rate_source?: string;
+  posa_account_currency?: string;
+  posa_account_amount?: number;
   [key: string]: any;
 }
 
@@ -142,6 +152,11 @@ export interface POSProfile {
   selling_price_list: string;
   income_account: string;
   expense_account: string;
+  ignore_pricing_rule?: boolean | number | string;
+  posa_enable_custom_branding?: boolean | number | string;
+  posa_brand_name?: string;
+  posa_brand_short_name?: string;
+  posa_brand_logo?: string;
   [key: string]: any;
 }
 

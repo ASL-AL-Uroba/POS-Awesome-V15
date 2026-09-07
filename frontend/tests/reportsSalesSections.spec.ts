@@ -83,6 +83,8 @@ const mountOptions = {
 };
 
 const formatMoney = (value: number) => `PKR ${value.toFixed(2)}`;
+const formatMoneyInCurrency = (value: number, currency?: string) =>
+	`${currency || "PKR"} ${value.toFixed(2)}`;
 const formatQuantity = (value: number) => String(value);
 const formatDate = (value?: string) => value || "-";
 const formatPercent = (value?: number | null, digits = 1) =>
@@ -233,11 +235,21 @@ describe("Sales report sections", () => {
 					split_invoice_count: 3,
 				},
 				methodRows: [
-					{ mode_of_payment: "Cash", category: "cash", amount: 400, invoice_count: 5, share_pct: 44.4 },
+					{
+						mode_of_payment: "Cash",
+						category: "cash",
+						amount: 400,
+						company_currency_amount: 400,
+						currency: "USD",
+						tender_amount: 1.4,
+						invoice_count: 5,
+						share_pct: 44.4,
+					},
 				],
 				dayRows: [{ date: "2026-05-18", paid_amount: 900, pending_amount: 100, invoice_count: 4 }],
 				dayMax: 1000,
 				formatMoney,
+				formatMoneyInCurrency,
 				formatQuantity,
 				formatDate,
 				formatPercent,
@@ -251,6 +263,9 @@ describe("Sales report sections", () => {
 		expect(wrapper.text()).toContain("Partial");
 		expect(wrapper.text()).toContain("Unpaid");
 		expect(wrapper.text()).toContain("Cash");
+		expect(wrapper.text()).toContain("Cash · USD");
+		expect(wrapper.text()).toContain("USD 1.40");
+		expect(wrapper.text()).toContain("Company equivalent: PKR 400.00");
 		expect(wrapper.text()).toContain("Share: 44.4%");
 		expect(wrapper.text()).toContain("Last 14 Days (Paid vs Pending)");
 		expect(wrapper.text()).toContain("Pending: PKR 100.00");

@@ -58,7 +58,7 @@ describe("get_draft_invoices", () => {
 		expect(context.$refs.invoiceSummary.openDraftsSurface).toHaveBeenCalled();
 	});
 
-	it("clears cached drafts without opening any drafts surface when no drafts exist", async () => {
+	it("clears cached drafts and refreshes the summary drafts surface when no drafts exist", async () => {
 		const context = {
 			pos_opening_shift: { name: "POS-OPEN-0001" },
 			pos_profile: { name: "Main POS" },
@@ -85,7 +85,9 @@ describe("get_draft_invoices", () => {
 		expect(context.uiStore.setDraftsData).toHaveBeenCalledWith([]);
 		expect(context.uiStore.setParkedOrders).toHaveBeenCalledWith([]);
 		expect(context.uiStore.closeDrafts).toHaveBeenCalled();
-		expect(context.$refs.invoiceSummary.openDraftsSurface).not.toHaveBeenCalled();
+		expect(context.$refs.invoiceSummary.openDraftsSurface).toHaveBeenCalledWith({
+			focus: false,
+		});
 	});
 });
 

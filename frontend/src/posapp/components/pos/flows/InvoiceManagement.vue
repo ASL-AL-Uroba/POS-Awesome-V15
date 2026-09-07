@@ -15,6 +15,7 @@
 					isDarkTheme ? 'invoice-management-card--dark' : 'invoice-management-card--light',
 				]"
 				variant="flat"
+				data-testid="invoice-management-dialog"
 			>
 				<v-card-title class="invoice-management-header">
 					<div>
@@ -281,6 +282,14 @@
 											>{{ __(item.status || "Draft") }}</v-chip
 										>
 										<v-chip
+											v-if="modificationCount(item)"
+											size="small"
+											color="secondary"
+											variant="tonal"
+										>
+											{{ modificationLabel(item) }}
+										</v-chip>
+										<v-chip
 											v-if="changeAllocationRepairState(item)"
 											size="small"
 											:color="repairStateColor(changeAllocationRepairState(item))"
@@ -301,12 +310,32 @@
 											@click="viewInvoice(item)"
 										/>
 										<v-btn
+											v-if="canEditSubmittedInvoice(item)"
+											icon="mdi-pencil-outline"
+											variant="text"
+											size="small"
+											color="primary"
+											:data-testid="`invoice-management-edit-${item.name}`"
+											:title="__('Edit Invoice')"
+											:aria-label="__('Edit submitted invoice')"
+											@click="openEditInvoice(item)"
+										/>
+										<v-btn
 											icon="mdi-printer-outline"
 											variant="text"
 											size="small"
 											:title="__('Print')"
 											:aria-label="__('Print invoice')"
 											@click="printInvoice(item)"
+										/>
+										<v-btn
+											icon="mdi-share-variant-outline"
+											variant="text"
+											size="small"
+											color="info"
+											:title="__('Share')"
+											:aria-label="__('Share invoice')"
+											@click="shareInvoice(item)"
 										/>
 										<v-btn
 											v-if="posProfile?.posa_allow_return == 1"
@@ -344,6 +373,14 @@
 													variant="flat"
 												>
 													{{ __(invoice.status || "Draft") }}
+												</v-chip>
+												<v-chip
+													v-if="modificationCount(invoice)"
+													size="small"
+													color="secondary"
+													variant="tonal"
+												>
+													{{ modificationLabel(invoice) }}
 												</v-chip>
 												<v-chip
 													v-if="changeAllocationRepairState(invoice)"
@@ -436,12 +473,32 @@
 											@click="viewInvoice(invoice)"
 										/>
 										<v-btn
+											v-if="canEditSubmittedInvoice(invoice)"
+											icon="mdi-pencil-outline"
+											size="small"
+											variant="text"
+											color="primary"
+											:data-testid="`invoice-management-edit-${invoice.name}`"
+											:title="__('Edit Invoice')"
+											:aria-label="__('Edit submitted invoice')"
+											@click="openEditInvoice(invoice)"
+										/>
+										<v-btn
 											icon="mdi-printer-outline"
 											size="small"
 											variant="text"
 											:title="__('Print')"
 											:aria-label="__('Print invoice')"
 											@click="printInvoice(invoice)"
+										/>
+										<v-btn
+											icon="mdi-share-variant-outline"
+											variant="text"
+											size="small"
+											color="info"
+											:title="__('Share')"
+											:aria-label="__('Share invoice')"
+											@click="shareInvoice(invoice)"
 										/>
 										<v-btn
 											v-if="posProfile?.posa_allow_return == 1"
@@ -639,9 +696,22 @@
 									{{ formatCurrency(item.outstanding_amount || 0) }}</template
 								>
 								<template #item.status="{ item }"
-									><v-chip size="small" :color="statusColor(item.status)" variant="tonal">{{
-										__(item.status || "Unpaid")
-									}}</v-chip></template
+									><div class="d-flex flex-wrap ga-1">
+										<v-chip
+											size="small"
+											:color="statusColor(item.status)"
+											variant="tonal"
+											>{{ __(item.status || "Unpaid") }}</v-chip
+										>
+										<v-chip
+											v-if="modificationCount(item)"
+											size="small"
+											color="secondary"
+											variant="tonal"
+										>
+											{{ modificationLabel(item) }}
+										</v-chip>
+									</div></template
 								>
 								<template #item.actions="{ item }">
 									<div class="d-flex justify-end ga-1">
@@ -654,6 +724,17 @@
 											:title="__('Add Payment')"
 											:aria-label="__('Add payment to invoice')"
 											@click="openAddPayment(item)"
+										/>
+										<v-btn
+											v-if="canEditSubmittedInvoice(item)"
+											icon="mdi-pencil-outline"
+											variant="text"
+											size="small"
+											color="primary"
+											:data-testid="`invoice-management-edit-${item.name}`"
+											:title="__('Edit Invoice')"
+											:aria-label="__('Edit submitted invoice')"
+											@click="openEditInvoice(item)"
 										/>
 										<v-btn
 											icon="mdi-eye-outline"
@@ -670,6 +751,15 @@
 											:title="__('Print')"
 											:aria-label="__('Print invoice')"
 											@click="printInvoice(item)"
+										/>
+										<v-btn
+											icon="mdi-share-variant-outline"
+											variant="text"
+											size="small"
+											color="info"
+											:title="__('Share')"
+											:aria-label="__('Share invoice')"
+											@click="shareInvoice(item)"
 										/>
 									</div>
 								</template>
@@ -698,6 +788,14 @@
 													variant="flat"
 												>
 													{{ __(invoice.status || "Unpaid") }}
+												</v-chip>
+												<v-chip
+													v-if="modificationCount(invoice)"
+													size="small"
+													color="secondary"
+													variant="tonal"
+												>
+													{{ modificationLabel(invoice) }}
 												</v-chip>
 											</div>
 											<div class="invoice-record-card__subtitle">
@@ -786,6 +884,17 @@
 											{{ __("Add Payment") }}
 										</v-btn>
 										<v-btn
+											v-if="canEditSubmittedInvoice(invoice)"
+											icon="mdi-pencil-outline"
+											size="small"
+											variant="text"
+											color="primary"
+											:data-testid="`invoice-management-edit-${invoice.name}`"
+											:title="__('Edit Invoice')"
+											:aria-label="__('Edit submitted invoice')"
+											@click="openEditInvoice(invoice)"
+										/>
+										<v-btn
 											icon="mdi-eye-outline"
 											size="small"
 											variant="text"
@@ -800,6 +909,15 @@
 											:title="__('Print')"
 											:aria-label="__('Print invoice')"
 											@click="printInvoice(invoice)"
+										/>
+										<v-btn
+											icon="mdi-share-variant-outline"
+											variant="text"
+											size="small"
+											color="info"
+											:title="__('Share')"
+											:aria-label="__('Share invoice')"
+											@click="shareInvoice(invoice)"
 										/>
 									</div>
 								</v-card>
@@ -1114,6 +1232,15 @@
 											:aria-label="__('Print invoice')"
 											@click="printInvoice(item)"
 										/>
+										<v-btn
+											icon="mdi-share-variant-outline"
+											variant="text"
+											size="small"
+											color="info"
+											:title="__('Share')"
+											:aria-label="__('Share invoice')"
+											@click="shareInvoice(item)"
+										/>
 									</div>
 								</template>
 							</v-data-table>
@@ -1192,6 +1319,15 @@
 											:title="__('Print')"
 											:aria-label="__('Print invoice')"
 											@click="printInvoice(invoice)"
+										/>
+										<v-btn
+											icon="mdi-share-variant-outline"
+											variant="text"
+											size="small"
+											color="info"
+											:title="__('Share')"
+											:aria-label="__('Share invoice')"
+											@click="shareInvoice(invoice)"
 										/>
 									</div>
 								</v-card>
@@ -1371,10 +1507,376 @@
 			</v-card-actions>
 		</v-card>
 	</v-dialog>
+
+	<v-dialog
+		v-model="editDialog"
+		max-width="1160px"
+		scrollable
+		content-class="invoice-edit-modal-content"
+		:theme="isDarkTheme ? 'dark' : 'light'"
+	>
+		<v-card
+			tabindex="0"
+			:class="[
+				'invoice-detail-card',
+				isDarkTheme ? 'invoice-detail-card--dark' : 'invoice-detail-card--light',
+			]"
+			data-testid="invoice-edit-modal"
+			@keydown.capture="handleEditModalKeydown"
+			@click.capture="handleEditModalClick"
+		>
+			<v-card-title class="d-flex align-center justify-space-between flex-wrap ga-3">
+				<div>
+					<div class="text-h6">{{ editInvoiceOriginal?.name || __("Edit Invoice") }}</div>
+					<div class="text-subtitle-2 text-medium-emphasis">
+						{{ editInvoiceDoc?.customer_name || editInvoiceDoc?.customer || "" }}
+					</div>
+				</div>
+				<div class="d-flex align-center ga-2">
+					<v-chip v-if="editInvoiceDoc?.doctype" size="small" color="primary" variant="tonal">
+						{{ __(editInvoiceDoc.doctype) }}
+					</v-chip>
+					<v-chip
+						v-if="editEligibility?.edit_window_hours"
+						size="small"
+						color="warning"
+						variant="tonal"
+					>
+						{{ __("{0}h window", [editEligibility.edit_window_hours]) }}
+					</v-chip>
+					<v-btn
+						icon="mdi-close"
+						variant="text"
+						class="edit-key-field"
+						data-edit-nav="close"
+						:aria-label="__('Close edit invoice dialog')"
+						@click="closeEditInvoice"
+					/>
+				</div>
+			</v-card-title>
+			<v-divider />
+			<v-card-text v-if="editLoading" class="tab-loader">
+				<v-progress-circular indeterminate color="primary" size="28" width="3" />
+				<span>{{ __("Loading editable invoice...") }}</span>
+			</v-card-text>
+			<v-card-text v-else-if="editInvoiceDoc">
+				<v-alert v-if="editError" type="error" variant="tonal" density="compact" class="mb-4">
+					{{ editError }}
+				</v-alert>
+				<div class="summary-grid mb-4">
+					<div class="summary-tile">
+						<div class="summary-tile__label">{{ __("Current Total") }}</div>
+						<div class="summary-tile__value">
+							{{ currencySymbol(editInvoiceDoc.currency) }}
+							{{ formatCurrency(editInvoiceDoc.grand_total || 0) }}
+						</div>
+					</div>
+					<div class="summary-tile">
+						<div class="summary-tile__label">{{ __("Preview Total") }}</div>
+						<div class="summary-tile__value">
+							<v-progress-circular
+								v-if="editPreviewLoading"
+								indeterminate
+								color="primary"
+								size="18"
+								width="2"
+								class="me-2"
+							/>
+							{{ currencySymbol(editPreviewDoc?.currency || editInvoiceDoc.currency) }}
+							{{ formatCurrency((editPreviewDoc || editInvoiceDoc).grand_total || 0) }}
+						</div>
+					</div>
+					<div class="summary-tile">
+						<div class="summary-tile__label">{{ __("Payment Applied") }}</div>
+						<div class="summary-tile__value">
+							{{ currencySymbol(editSettlementCurrency) }}
+							{{ formatCurrency(editAutoPaymentTotal) }}
+						</div>
+					</div>
+					<div class="summary-tile">
+						<div class="summary-tile__label">{{ __("Cash Difference") }}</div>
+						<div class="summary-tile__value">
+							{{ currencySymbol(editSettlementCurrency) }}
+							{{ formatCurrency(Math.abs(editSettlementDelta)) }}
+						</div>
+						<div class="summary-tile__meta">
+							{{ editSettlementLabel }}
+						</div>
+					</div>
+				</div>
+				<div
+					class="edit-settlement-summary mb-4"
+					:class="editSettlementSummaryClass"
+					data-testid="invoice-edit-settlement-summary"
+				>
+					<div>
+						<div class="edit-settlement-summary__label">{{ __("Cashier Action") }}</div>
+						<div class="edit-settlement-summary__value">
+							{{ editSettlementLabel }}
+						</div>
+					</div>
+					<div class="edit-settlement-summary__amount">
+						{{ currencySymbol(editSettlementCurrency) }}
+						{{ formatCurrency(Math.abs(editSettlementDelta)) }}
+					</div>
+				</div>
+
+				<div class="edit-form-grid mb-4">
+					<v-text-field
+						v-model="editInvoiceDoc.customer"
+						variant="outlined"
+						density="compact"
+						hide-details
+						class="edit-key-field"
+						data-edit-nav="customer"
+						data-testid="invoice-edit-customer"
+						:label="__('Customer')"
+						@update:model-value="scheduleEditPreview()"
+					/>
+					<v-text-field
+						v-model.number="editInvoiceDoc.discount_amount"
+						type="number"
+						variant="outlined"
+						density="compact"
+						hide-details
+						class="edit-key-field"
+						data-edit-nav="discount_amount"
+						data-testid="invoice-edit-discount-amount"
+						:label="__('Invoice Discount')"
+						@update:model-value="scheduleEditPreview()"
+					/>
+					<v-text-field
+						v-model.number="editInvoiceDoc.additional_discount_percentage"
+						type="number"
+						variant="outlined"
+						density="compact"
+						hide-details
+						class="edit-key-field"
+						data-edit-nav="additional_discount_percentage"
+						data-testid="invoice-edit-additional-discount-percentage"
+						:label="__('Additional Discount %')"
+						@update:model-value="scheduleEditPreview()"
+					/>
+				</div>
+
+				<div class="detail-section__title">{{ __("Items") }}</div>
+				<v-table class="elevation-1 edit-invoice-table">
+					<thead>
+						<tr>
+							<th>{{ __("Item") }}</th>
+							<th>{{ __("Qty") }}</th>
+							<th>{{ __("Rate") }}</th>
+							<th>{{ __("Discount %") }}</th>
+							<th>{{ __("Discount") }}</th>
+							<th class="text-end">{{ __("Actions") }}</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr v-for="(item, index) in editInvoiceDoc.items || []" :key="item.name || index">
+							<td>
+								<div class="edit-item-title">{{ item.item_name || item.item_code }}</div>
+								<div class="text-caption text-medium-emphasis">{{ item.item_code }}</div>
+							</td>
+							<td>
+								<v-text-field
+									v-model.number="item.qty"
+									type="number"
+									variant="outlined"
+									density="compact"
+									hide-details
+									class="edit-number-input edit-key-field"
+									:data-edit-nav="`item-${index}-qty`"
+									:data-testid="`invoice-edit-item-${index}-qty`"
+									:data-edit-row="index"
+									data-edit-col="qty"
+									data-edit-section="items"
+									@update:model-value="scheduleEditPreview()"
+								/>
+							</td>
+							<td>
+								<v-text-field
+									v-model.number="item.rate"
+									type="number"
+									variant="outlined"
+									density="compact"
+									hide-details
+									class="edit-number-input edit-key-field"
+									:data-edit-nav="`item-${index}-rate`"
+									:data-testid="`invoice-edit-item-${index}-rate`"
+									:data-edit-row="index"
+									data-edit-col="rate"
+									data-edit-section="items"
+									@update:model-value="scheduleEditPreview()"
+								/>
+							</td>
+							<td>
+								<v-text-field
+									v-model.number="item.discount_percentage"
+									type="number"
+									variant="outlined"
+									density="compact"
+									hide-details
+									class="edit-number-input edit-key-field"
+									:data-edit-nav="`item-${index}-discount_percentage`"
+									:data-testid="`invoice-edit-item-${index}-discount-percentage`"
+									:data-edit-row="index"
+									data-edit-col="discount_percentage"
+									data-edit-section="items"
+									@update:model-value="scheduleEditPreview()"
+								/>
+							</td>
+							<td>
+								<v-text-field
+									v-model.number="item.discount_amount"
+									type="number"
+									variant="outlined"
+									density="compact"
+									hide-details
+									class="edit-number-input edit-key-field"
+									:data-edit-nav="`item-${index}-discount_amount`"
+									:data-testid="`invoice-edit-item-${index}-discount-amount`"
+									:data-edit-row="index"
+									data-edit-col="discount_amount"
+									data-edit-section="items"
+									@update:model-value="scheduleEditPreview()"
+								/>
+							</td>
+							<td class="text-end">
+								<v-btn
+									icon="mdi-delete-outline"
+									variant="text"
+									size="small"
+									color="error"
+									class="edit-key-field"
+									:data-edit-nav="`item-${index}-remove`"
+									:data-edit-row="index"
+									data-edit-col="remove"
+									data-edit-section="items"
+									:title="__('Remove Item')"
+									:aria-label="__('Remove item')"
+									@click="removeEditItem(index)"
+								/>
+							</td>
+						</tr>
+					</tbody>
+				</v-table>
+				<div class="edit-add-row mt-3">
+					<v-text-field
+						v-model="newEditItem.item_code"
+						variant="outlined"
+						density="compact"
+						hide-details
+						class="edit-key-field"
+						data-edit-nav="new-item-code"
+						data-edit-section="new-item"
+						:label="__('Item Code')"
+					/>
+					<v-text-field
+						v-model.number="newEditItem.qty"
+						type="number"
+						variant="outlined"
+						density="compact"
+						hide-details
+						class="edit-key-field"
+						data-edit-nav="new-item-qty"
+						data-edit-section="new-item"
+						:label="__('Qty')"
+					/>
+					<v-text-field
+						v-model.number="newEditItem.rate"
+						type="number"
+						variant="outlined"
+						density="compact"
+						hide-details
+						class="edit-key-field"
+						data-edit-nav="new-item-rate"
+						data-edit-section="new-item"
+						:label="__('Rate')"
+					/>
+					<v-btn
+						color="primary"
+						variant="tonal"
+						prepend-icon="mdi-plus"
+						class="edit-key-field"
+						data-edit-nav="new-item-add"
+						data-edit-section="new-item"
+						@click="addEditItem"
+					>
+						{{ __("Add Item") }}
+					</v-btn>
+				</div>
+
+				<div class="detail-section__title mt-4">{{ __("Payments") }}</div>
+				<v-table class="elevation-1 edit-invoice-table">
+					<thead>
+						<tr>
+							<th>{{ __("Mode") }}</th>
+							<th>{{ __("Amount") }}</th>
+							<th>{{ __("Account") }}</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr
+							v-for="(payment, index) in editInvoiceDoc.payments || []"
+							:key="payment.name || index"
+						>
+							<td>{{ payment.mode_of_payment }}</td>
+							<td>
+								<v-text-field
+									v-model.number="payment.amount"
+									type="number"
+									variant="outlined"
+									density="compact"
+									hide-details
+									class="edit-number-input edit-key-field"
+									:data-edit-nav="`payment-${index}-amount`"
+									:data-testid="`invoice-edit-payment-${index}-amount`"
+									:data-edit-row="index"
+									data-edit-col="amount"
+									data-edit-section="payments"
+									readonly
+									:label="__('Auto Adjusted')"
+								/>
+							</td>
+							<td>{{ payment.account || "-" }}</td>
+						</tr>
+					</tbody>
+				</v-table>
+			</v-card-text>
+			<v-card-actions>
+				<v-spacer />
+				<div class="edit-preview-status text-caption text-medium-emphasis">
+					{{ editPreviewStatus }}
+				</div>
+				<v-btn
+					color="error"
+					variant="tonal"
+					class="edit-key-field"
+					data-edit-nav="cancel"
+					:disabled="editSubmitting"
+					@click="closeEditInvoice"
+				>
+					{{ __("Cancel") }}
+				</v-btn>
+				<v-btn
+					color="primary"
+					variant="flat"
+					prepend-icon="mdi-content-save-check-outline"
+					class="edit-key-field"
+					data-edit-nav="submit"
+					data-testid="invoice-edit-submit"
+					:loading="editSubmitting"
+					:disabled="editLoading || editSubmitting || isOffline()"
+					@click="submitEditInvoice"
+				>
+					{{ __("Submit Amendment") }}
+				</v-btn>
+			</v-card-actions>
+		</v-card>
+	</v-dialog>
 </template>
 
 <script>
-/* global __ */
 import { inject, computed } from "vue";
 import { storeToRefs } from "pinia";
 import { useRouter } from "vue-router";
@@ -1392,8 +1894,14 @@ import {
 	silentPrint,
 	watchPrintWindow,
 } from "../../../plugins/print";
-import { printDocumentViaQz } from "../../../services/qzTray";
+import {
+	confirmDocumentPrintFallback,
+	printDocumentViaConfiguredQz,
+	shouldUseConfiguredQzDocumentPrinting,
+	shouldUseRawDocumentPrinting,
+} from "../../../services/documentPrint";
 import { isOffline } from "../../../../offline/index";
+import { buildInvoicePdfUrl, shouldDownloadPdfForShareError } from "../../../utils/invoiceSharing";
 import DocumentSourceSelector from "../shared/DocumentSourceSelector.vue";
 import {
 	canDeleteDocumentSourceRecord,
@@ -1491,6 +1999,7 @@ export default {
 		returnDateTo: "",
 		unpaidInvoices: [],
 		historyInvoices: [],
+		isSharingInvoice: false,
 		draftRecordsBySource: {
 			invoice: [],
 			order: [],
@@ -1500,6 +2009,27 @@ export default {
 		repairChangeLoading: false,
 		detailDialog: false,
 		selectedInvoiceDetail: null,
+		editDialog: false,
+		editLoading: false,
+		editSubmitting: false,
+		editPreviewLoading: false,
+		editPreviewTimer: null,
+		editPreviewRequestId: 0,
+		editPreviewDirty: false,
+		editPreviewLastUpdatedAt: null,
+		editError: "",
+		editInvoiceOriginal: null,
+		editInvoiceDoc: null,
+		editPreviewDoc: null,
+		editEligibility: null,
+		editKeyboardTargetKey: "",
+		editKeyboardEditing: false,
+		editKeyboardGeneratedId: 0,
+		newEditItem: {
+			item_code: "",
+			qty: 1,
+			rate: 0,
+		},
 		partialStatusItems: ["All", "Partly Paid", "Unpaid", "Overdue"],
 		historyStatusItems: ["All", "Paid", "Partly Paid", "Unpaid", "Overdue", "Credit Note Issued"].map((s) => ({
 				title: __(s),
@@ -1721,8 +2251,66 @@ export default {
 		returnsPageCount() {
 			return this.pageCount(this.filteredReturnInvoices.length);
 		},
+		editPaymentTotal() {
+			return (this.editInvoiceDoc?.payments || []).reduce(
+				(total, payment) => total + Number(payment?.amount || 0),
+				0,
+			);
+		},
+		editSettlementCurrency() {
+			return (this.editPreviewDoc || this.editInvoiceDoc || {}).currency || this.posProfile?.currency;
+		},
+		editCorrectedTotal() {
+			const source = this.editPreviewDoc || this.editInvoiceDoc || {};
+			return this.normalizeEditMoney(source.rounded_total || source.grand_total || 0);
+		},
+		editOriginalPaidTotal() {
+			const source = this.editInvoiceOriginal || this.editInvoiceDoc || {};
+			const paid = Number(source.paid_amount ?? 0);
+			if (Number.isFinite(paid) && Math.abs(paid) > 0) {
+				return this.normalizeEditMoney(paid);
+			}
+			return this.normalizeEditMoney(
+				(source.payments || []).reduce((total, payment) => total + Number(payment?.amount || 0), 0),
+			);
+		},
+		editAutoPaymentTotal() {
+			return this.normalizeEditMoney(this.editCorrectedTotal);
+		},
+		editSettlementDelta() {
+			return this.normalizeEditMoney(this.editCorrectedTotal - this.editOriginalPaidTotal);
+		},
+		editSettlementLabel() {
+			const delta = this.editSettlementDelta;
+			if (delta > 0) return __("Collect from customer");
+			if (delta < 0) return __("Refund to customer");
+			return __("No cash difference");
+		},
+		editSettlementSummaryClass() {
+			return {
+				"edit-settlement-summary--collect": this.editSettlementDelta > 0,
+				"edit-settlement-summary--refund": this.editSettlementDelta < 0,
+				"edit-settlement-summary--balanced": this.editSettlementDelta === 0,
+			};
+		},
+		editPreviewStatus() {
+			if (this.editPreviewLoading) return __("Recalculating...");
+			if (this.editPreviewDirty) return __("Recalculation pending");
+			if (this.editPreviewLastUpdatedAt) return __("Totals updated");
+			return __("Totals update automatically");
+		},
 	},
 	watch: {
+		editDialog(value) {
+			if (!value) {
+				this.clearScheduledEditPreview();
+				this.clearEditKeyboardBox();
+				this.editKeyboardTargetKey = "";
+				this.editKeyboardEditing = false;
+			} else {
+				this.$nextTick(() => this.setDefaultEditKeyboardTarget());
+			}
+		},
 		invoiceManagementDialog(value) {
 			if (value) {
 				this.activeTab = this.invoiceManagementTargetTab || "history";
@@ -1784,6 +2372,9 @@ export default {
 			},
 			deep: true,
 		},
+	},
+	beforeUnmount() {
+		this.clearScheduledEditPreview();
 	},
 	methods: {
 		resetPagination() {
@@ -2069,6 +2660,27 @@ export default {
 				"modified_by",
 				...extraFields,
 			];
+		},
+		submittedInvoiceListArgs(doctype, filters, extraFields = []) {
+			return {
+				doctype,
+				filters,
+				fields: this.getInvoiceListFields(extraFields),
+				order_by: "posting_date desc, posting_time desc, modified desc",
+				limit_page_length: 0,
+				pos_profile: filters?.pos_profile || null,
+				company: filters?.company || null,
+			};
+		},
+		modificationCount(invoice) {
+			return Number(invoice?.amendment_count || 0);
+		},
+		modificationLabel(invoice) {
+			const count = this.modificationCount(invoice);
+			return count > 0 ? __("Modified x{0}", [count]) : "";
+		},
+		canEditSubmittedInvoice(invoice) {
+			return Boolean(invoice?.can_edit_submitted_invoice);
 		},
 		sortInvoicesByLatest(items) {
 			return [...items].sort(
@@ -2375,14 +2987,8 @@ export default {
 					outstanding_amount: [">", 0],
 				});
 				const { message } = await frappe.call({
-					method: "frappe.client.get_list",
-					args: {
-						doctype: this.currentInvoiceDoctype,
-						filters,
-						fields: this.getInvoiceListFields(["due_date"]),
-						order_by: "posting_date desc, posting_time desc, modified desc",
-						limit_page_length: 0,
-					},
+					method: "posawesome.posawesome.api.invoices.list_submitted_invoices",
+					args: this.submittedInvoiceListArgs(this.currentInvoiceDoctype, filters, ["due_date"]),
 				});
 				this.unpaidInvoices = Array.isArray(message)
 					? message.map((entry) => ({ ...entry, doctype: this.currentInvoiceDoctype }))
@@ -2414,18 +3020,12 @@ export default {
 				const results = await Promise.all(
 					doctypes.map(async (doctype) => {
 						const { message } = await frappe.call({
-							method: "frappe.client.get_list",
-							args: {
-								doctype,
-								filters,
-								fields: this.getInvoiceListFields([
-									"change_amount",
-									"is_return",
-									"return_against",
-								]),
-								order_by: "posting_date desc, posting_time desc, modified desc",
-								limit_page_length: 0,
-							},
+							method: "posawesome.posawesome.api.invoices.list_submitted_invoices",
+							args: this.submittedInvoiceListArgs(doctype, filters, [
+								"change_amount",
+								"is_return",
+								"return_against",
+							]),
 						});
 						return Array.isArray(message) ? message.map((entry) => ({ ...entry, doctype })) : [];
 					}),
@@ -2487,6 +3087,595 @@ export default {
 			} catch (error) {
 				console.error("Error loading invoice details:", error);
 				this.toastStore.show({ title: __("Unable to load invoice details"), color: "error" });
+			}
+		},
+		closeEditInvoice() {
+			this.clearScheduledEditPreview();
+			this.editPreviewRequestId = Number(this.editPreviewRequestId || 0) + 1;
+			this.editDialog = false;
+			this.editLoading = false;
+			this.editSubmitting = false;
+			this.editPreviewLoading = false;
+			this.editPreviewDirty = false;
+			this.editPreviewLastUpdatedAt = null;
+			this.editError = "";
+			this.editInvoiceOriginal = null;
+			this.editInvoiceDoc = null;
+			this.editPreviewDoc = null;
+			this.editEligibility = null;
+			this.newEditItem = { item_code: "", qty: 1, rate: 0 };
+		},
+		editScopeArgs(invoice) {
+			return {
+				doctype: invoice?.doctype || this.currentInvoiceDoctype,
+				name: invoice?.name,
+				pos_profile: this.isSupervisorScope()
+					? this.resolveSupervisorProfileScope()
+					: this.posProfile?.name,
+				company: this.posProfile?.company || null,
+			};
+		},
+		cloneForEdit(value) {
+			return JSON.parse(JSON.stringify(value || {}));
+		},
+		normalizeEditMoney(value) {
+			const precision = Number.isInteger(Number(this.currency_precision))
+				? Number(this.currency_precision)
+				: 2;
+			const factor = 10 ** Math.max(0, precision);
+			const number = Number(value || 0);
+			if (!Number.isFinite(number)) return 0;
+			return Math.round(number * factor) / factor;
+		},
+		ensureEditPaymentRows() {
+			if (!this.editInvoiceDoc) return [];
+			if (!Array.isArray(this.editInvoiceDoc.payments)) {
+				this.editInvoiceDoc.payments = [];
+			}
+			if (!this.editInvoiceDoc.payments.length) {
+				const profilePayment = Array.isArray(this.posProfile?.payments)
+					? this.posProfile.payments.find((payment) => payment?.mode_of_payment)
+					: null;
+				this.editInvoiceDoc.payments.push({
+					mode_of_payment: profilePayment?.mode_of_payment || "Cash",
+					account: profilePayment?.account || "",
+					type: profilePayment?.type || "Cash",
+					default: profilePayment?.default || 1,
+					amount: 0,
+					base_amount: 0,
+					currency: this.editInvoiceDoc.currency || this.posProfile?.currency,
+					conversion_rate: Number(this.editInvoiceDoc.conversion_rate || 1),
+				});
+			}
+			return this.editInvoiceDoc.payments;
+		},
+		syncEditPaymentsToCorrectedTotal(totalOverride = null, previewDoc = null) {
+			if (!this.editInvoiceDoc) return 0;
+			const targetTotal = this.normalizeEditMoney(
+				totalOverride ?? this.editCorrectedTotal ?? this.editInvoiceDoc.grand_total,
+			);
+			const payments = this.ensureEditPaymentRows();
+			if (!payments.length) return targetTotal;
+			const primaryIndex = Math.max(
+				0,
+				payments.findIndex((payment) =>
+					String(payment?.mode_of_payment || "")
+						.toLowerCase()
+						.includes("cash"),
+				),
+			);
+			payments.forEach((payment, index) => {
+				const amount = index === primaryIndex ? targetTotal : 0;
+				payment.amount = amount;
+				payment.base_amount = this.normalizeEditMoney(
+					amount * Number(payment.conversion_rate || this.editInvoiceDoc.conversion_rate || 1),
+				);
+			});
+			if (previewDoc) {
+				previewDoc.paid_amount = targetTotal;
+				previewDoc.base_paid_amount = this.normalizeEditMoney(
+					targetTotal *
+						Number(previewDoc.conversion_rate || this.editInvoiceDoc.conversion_rate || 1),
+				);
+				previewDoc.outstanding_amount = 0;
+			}
+			return targetTotal;
+		},
+		clearScheduledEditPreview() {
+			if (this.editPreviewTimer) {
+				if (typeof window !== "undefined") window.clearTimeout(this.editPreviewTimer);
+				this.editPreviewTimer = null;
+			}
+		},
+		scheduleEditPreview(delay = 450) {
+			if (!this.editDialog || this.editLoading || this.editSubmitting || !this.editInvoiceDoc?.name) {
+				return;
+			}
+			this.editPreviewDirty = true;
+			this.clearScheduledEditPreview();
+			if (typeof window === "undefined") return;
+			this.editPreviewTimer = window.setTimeout(() => {
+				this.editPreviewTimer = null;
+				this.previewEditInvoice({ silent: true });
+			}, delay);
+		},
+		editModalElement() {
+			if (typeof document === "undefined") return null;
+			return document.querySelector(".invoice-edit-modal-content");
+		},
+		editModalFocusRoot() {
+			const modal = this.editModalElement();
+			return modal?.querySelector?.(".invoice-detail-card") || modal;
+		},
+		isEditElementVisible(element) {
+			if (!element?.isConnected || typeof window === "undefined") return false;
+			const style = window.getComputedStyle(element);
+			if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+				return false;
+			}
+			const rect = element.getBoundingClientRect();
+			return rect.width > 0 && rect.height > 0;
+		},
+		clearEditKeyboardBox() {
+			const modal = this.editModalElement();
+			modal?.querySelectorAll?.(".edit-keyboard-box")?.forEach((element) => {
+				element.classList.remove("edit-keyboard-box");
+			});
+		},
+		ensureEditNavKey(element) {
+			if (!element?.dataset) return "";
+			if (!element.dataset.editKeyboardKey) {
+				this.editKeyboardGeneratedId = Number(this.editKeyboardGeneratedId || 0) + 1;
+				element.dataset.editKeyboardKey = `edit-target-${this.editKeyboardGeneratedId}`;
+			}
+			return element.dataset.editKeyboardKey;
+		},
+		setEditKeyboardTarget(element, options = {}) {
+			this.clearEditKeyboardBox();
+			if (!element) {
+				this.editKeyboardTargetKey = "";
+				return false;
+			}
+			const shouldFocusRoot = options?.focusRoot !== false;
+			this.editKeyboardTargetKey = this.ensureEditNavKey(element);
+			element.classList.add("edit-keyboard-box");
+			element.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+			if (shouldFocusRoot) {
+				this.editModalFocusRoot()?.focus?.({ preventScroll: true });
+			}
+			return true;
+		},
+		currentEditKeyboardTarget() {
+			const modal = this.editModalElement();
+			if (!modal || !this.editKeyboardTargetKey) return null;
+			return modal.querySelector(`[data-edit-keyboard-key="${this.editKeyboardTargetKey}"]`);
+		},
+		editNavigationFields() {
+			const modal = this.editModalElement();
+			if (!modal) return [];
+			return Array.from(modal.querySelectorAll("[data-edit-nav]")).filter((element) => {
+				if (
+					element.disabled ||
+					element.getAttribute("aria-disabled") === "true" ||
+					element.classList.contains("v-btn--disabled") ||
+					!this.isEditElementVisible(element)
+				) {
+					return false;
+				}
+				const input = this.editFocusableElement(element);
+				return Boolean(input && !input.disabled && input.getAttribute("aria-disabled") !== "true");
+			});
+		},
+		editFocusableElement(element) {
+			if (!element) return null;
+			return element.matches("input, textarea, button, select, [contenteditable='true']")
+				? element
+				: element.querySelector("input, textarea, button, select, [contenteditable='true']");
+		},
+		focusEditField(element) {
+			if (!element) return false;
+			const target = this.editFocusableElement(element);
+			if (!target || target.disabled) return false;
+			const root = element.closest?.("[data-edit-nav]") || element;
+			this.setEditKeyboardTarget(root, { focusRoot: false });
+			target.focus();
+			if (
+				typeof target.select === "function" &&
+				target.matches("input[type='number'], input[type='text']")
+			) {
+				target.select();
+			}
+			this.editKeyboardEditing = target.matches("input, textarea, select, [contenteditable='true']");
+			return true;
+		},
+		focusEditFieldByPredicate(predicate) {
+			const fields = this.editNavigationFields();
+			const field = fields.find(predicate);
+			return this.focusEditField(field);
+		},
+		focusNextEditField(currentElement, direction = 1) {
+			const fields = this.editNavigationFields();
+			if (!fields.length) return false;
+			const currentRoot = currentElement?.closest?.("[data-edit-nav]") || currentElement;
+			const currentIndex = Math.max(fields.indexOf(currentRoot), 0);
+			const nextIndex = (currentIndex + direction + fields.length) % fields.length;
+			return this.setEditKeyboardTarget(fields[nextIndex]);
+		},
+		focusVerticalEditField(currentElement, direction = 1) {
+			const currentRoot = currentElement?.closest?.("[data-edit-nav]");
+			if (!currentRoot) return false;
+			const section = currentRoot.dataset.editSection;
+			const column = currentRoot.dataset.editCol;
+			const row = Number(currentRoot.dataset.editRow);
+			if (!section || !column || !Number.isFinite(row)) return false;
+			return this.focusEditFieldByPredicate((element) => {
+				return (
+					element.dataset.editSection === section &&
+					element.dataset.editCol === column &&
+					Number(element.dataset.editRow) === row + direction
+				);
+			});
+		},
+		targetCenter(element) {
+			const rect = element.getBoundingClientRect();
+			return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+		},
+		scoreEditTargetForArrow(key, current, element) {
+			const candidate = this.targetCenter(element);
+			const dx = candidate.x - current.x;
+			const dy = candidate.y - current.y;
+			if (key === "ArrowRight" && dx <= 1) return null;
+			if (key === "ArrowLeft" && dx >= -1) return null;
+			if (key === "ArrowDown" && dy <= 1) return null;
+			if (key === "ArrowUp" && dy >= -1) return null;
+			const primary = key === "ArrowRight" || key === "ArrowLeft" ? Math.abs(dx) : Math.abs(dy);
+			const secondary = key === "ArrowRight" || key === "ArrowLeft" ? Math.abs(dy) : Math.abs(dx);
+			return secondary * 1000 + primary;
+		},
+		sortEditFieldsByPosition(fields) {
+			return [...fields].sort((left, right) => {
+				const leftRect = left.getBoundingClientRect();
+				const rightRect = right.getBoundingClientRect();
+				return leftRect.top - rightRect.top || leftRect.left - rightRect.left;
+			});
+		},
+		setDefaultEditKeyboardTarget() {
+			if (!this.editDialog || this.editLoading) return false;
+			const fields = this.editNavigationFields();
+			if (!fields.length) return false;
+			const preferred = fields.find((element) => element.dataset.editNav === "customer") || fields[0];
+			return this.setEditKeyboardTarget(preferred);
+		},
+		moveEditKeyboardBox(key) {
+			const fields = this.editNavigationFields();
+			if (!fields.length) return false;
+			const current = this.currentEditKeyboardTarget();
+			if (!current || !fields.includes(current)) {
+				return this.setEditKeyboardTarget(this.sortEditFieldsByPosition(fields)[0]);
+			}
+			const currentCenter = this.targetCenter(current);
+			let bestTarget = null;
+			let bestScore = Number.POSITIVE_INFINITY;
+			for (const field of fields) {
+				if (field === current) continue;
+				const score = this.scoreEditTargetForArrow(key, currentCenter, field);
+				if (score !== null && score < bestScore) {
+					bestScore = score;
+					bestTarget = field;
+				}
+			}
+			if (!bestTarget) {
+				const ordered = this.sortEditFieldsByPosition(fields);
+				const index = ordered.indexOf(current);
+				const delta = key === "ArrowLeft" || key === "ArrowUp" ? -1 : 1;
+				bestTarget = ordered[Math.max(0, Math.min(index + delta, ordered.length - 1))];
+			}
+			return bestTarget ? this.setEditKeyboardTarget(bestTarget) : false;
+		},
+		stopEditKeyboardEditing() {
+			this.editKeyboardEditing = false;
+			const active = document.activeElement;
+			active?.blur?.();
+			this.editModalFocusRoot()?.focus?.({ preventScroll: true });
+		},
+		activateEditKeyboardTarget() {
+			const target = this.currentEditKeyboardTarget() || this.editNavigationFields()[0];
+			if (!target) return false;
+			this.setEditKeyboardTarget(target);
+			const focusable = this.editFocusableElement(target);
+			if (!focusable || focusable.disabled) return false;
+			if (focusable.matches("button")) {
+				focusable.click();
+				this.$nextTick(() => {
+					if (target.dataset.editNav === "new-item-add") {
+						this.setEditKeyboardTarget(
+							this.editNavigationFields().find(
+								(element) => element.dataset.editNav === "new-item-code",
+							),
+						);
+						return;
+					}
+					this.setDefaultEditKeyboardTarget();
+				});
+				return true;
+			}
+			this.focusEditField(target);
+			return true;
+		},
+		handleEditModalClick(event) {
+			const target = event.target?.closest?.("[data-edit-nav]");
+			if (target) {
+				this.setEditKeyboardTarget(target);
+				this.editKeyboardEditing = Boolean(
+					this.editFocusableElement(target)?.matches(
+						"input, textarea, select, [contenteditable='true']",
+					),
+				);
+			}
+		},
+		handleEditModalKeydown(event) {
+			if (!this.editDialog || this.editLoading) return;
+			if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+				event.preventDefault();
+				this.submitEditInvoice();
+				return;
+			}
+			if (event.key === "Escape") {
+				event.preventDefault();
+				if (this.editKeyboardEditing) {
+					this.stopEditKeyboardEditing();
+					return;
+				}
+				if (!this.editSubmitting) this.closeEditInvoice();
+				return;
+			}
+			if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+				if (this.editKeyboardEditing) {
+					return;
+				}
+				event.preventDefault();
+				event.stopPropagation();
+				this.moveEditKeyboardBox(event.key);
+				return;
+			}
+			if (event.key === "Tab") {
+				event.preventDefault();
+				event.stopPropagation();
+				if (this.editKeyboardEditing) this.stopEditKeyboardEditing();
+				this.moveEditKeyboardBox(event.shiftKey ? "ArrowLeft" : "ArrowRight");
+				return;
+			}
+			const target = event.target;
+			const fieldRoot = target?.closest?.("[data-edit-nav]");
+			if (event.key === "Enter") {
+				event.preventDefault();
+				const activeRoot = document.activeElement?.closest?.("[data-edit-nav]");
+				if ((this.editKeyboardEditing || activeRoot === fieldRoot) && fieldRoot) {
+					this.editKeyboardEditing = false;
+					this.setEditKeyboardTarget(fieldRoot);
+					this.moveEditKeyboardBox(event.shiftKey ? "ArrowLeft" : "ArrowRight");
+					return;
+				}
+				this.activateEditKeyboardTarget();
+			}
+		},
+		async openEditInvoice(invoice) {
+			if (!invoice?.name) return;
+			if (isOffline()) {
+				this.toastStore.show({
+					title: __("Editing submitted invoices requires an online connection"),
+					color: "warning",
+				});
+				return;
+			}
+			if (!this.canEditSubmittedInvoice(invoice)) {
+				this.toastStore.show({
+					title: invoice?.edit_block_reason || __("This invoice cannot be edited"),
+					color: "warning",
+				});
+				return;
+			}
+			this.editDialog = true;
+			this.editLoading = true;
+			this.editError = "";
+			this.editInvoiceOriginal = invoice;
+			this.editPreviewDoc = null;
+			try {
+				const { message } = await frappe.call({
+					method: "posawesome.posawesome.api.invoices.get_submitted_invoice_for_edit",
+					args: this.editScopeArgs(invoice),
+				});
+				this.editInvoiceDoc = this.cloneForEdit(message?.invoice || {});
+				this.editEligibility = message?.metadata || null;
+				if (!Array.isArray(this.editInvoiceDoc.items)) this.editInvoiceDoc.items = [];
+				if (!Array.isArray(this.editInvoiceDoc.payments)) this.editInvoiceDoc.payments = [];
+				this.syncEditPaymentsToCorrectedTotal(
+					this.editInvoiceDoc.rounded_total || this.editInvoiceDoc.grand_total || 0,
+				);
+			} catch (error) {
+				console.error("Error loading editable invoice:", error);
+				this.editError = error?.message || __("Unable to load editable invoice");
+				this.toastStore.show({ title: this.editError, color: "error" });
+				this.closeEditInvoice();
+			} finally {
+				this.editLoading = false;
+				if (this.editDialog && this.editInvoiceDoc?.name) {
+					this.$nextTick(() => {
+						this.setDefaultEditKeyboardTarget();
+						this.scheduleEditPreview(0);
+					});
+				}
+			}
+		},
+		removeEditItem(index) {
+			if (!Array.isArray(this.editInvoiceDoc?.items)) return;
+			if (this.editInvoiceDoc.items.length <= 1) {
+				this.toastStore.show({ title: __("Invoice must have at least one item"), color: "warning" });
+				return false;
+			}
+			this.editInvoiceDoc.items.splice(index, 1);
+			this.editPreviewDoc = null;
+			this.scheduleEditPreview();
+			return true;
+		},
+		addEditItem() {
+			const itemCode = String(this.newEditItem?.item_code || "").trim();
+			if (!itemCode) {
+				this.toastStore.show({ title: __("Item code is required"), color: "warning" });
+				return false;
+			}
+			if (!Array.isArray(this.editInvoiceDoc.items)) this.editInvoiceDoc.items = [];
+			this.editInvoiceDoc.items.push({
+				item_code: itemCode,
+				item_name: itemCode,
+				qty: Number(this.newEditItem.qty || 1),
+				rate: Number(this.newEditItem.rate || 0),
+				discount_percentage: 0,
+				discount_amount: 0,
+			});
+			this.newEditItem = { item_code: "", qty: 1, rate: 0 };
+			this.editPreviewDoc = null;
+			this.scheduleEditPreview();
+			return true;
+		},
+		buildEditCorrectionData() {
+			this.syncEditPaymentsToCorrectedTotal();
+			const doc = this.editInvoiceDoc || {};
+			return {
+				customer: doc.customer,
+				discount_amount: Number(doc.discount_amount || 0),
+				additional_discount_percentage: Number(doc.additional_discount_percentage || 0),
+				apply_discount_on: doc.apply_discount_on || "Grand Total",
+				due_date: doc.due_date || null,
+				items: (doc.items || []).map((item) => ({
+					name: item.name,
+					item_code: item.item_code,
+					item_name: item.item_name,
+					description: item.description,
+					qty: Number(item.qty || 0),
+					uom: item.uom,
+					stock_uom: item.stock_uom,
+					conversion_factor: Number(item.conversion_factor || 1),
+					warehouse: item.warehouse,
+					rate: Number(item.rate || 0),
+					price_list_rate: Number(item.price_list_rate || item.rate || 0),
+					discount_percentage: Number(item.discount_percentage || 0),
+					discount_amount: Number(item.discount_amount || 0),
+					is_free_item: Number(item.is_free_item || 0),
+					batch_no: item.batch_no,
+					serial_no: item.serial_no,
+					income_account: item.income_account,
+					expense_account: item.expense_account,
+					cost_center: item.cost_center,
+				})),
+				payments: (doc.payments || []).map((payment) => ({
+					name: payment.name,
+					mode_of_payment: payment.mode_of_payment,
+					amount: Number(payment.amount || 0),
+					base_amount: Number(payment.base_amount || 0),
+					account: payment.account,
+					type: payment.type,
+					default: payment.default,
+					currency: payment.currency,
+					conversion_rate: Number(payment.conversion_rate || 1),
+				})),
+			};
+		},
+		async previewEditInvoice(options = {}) {
+			if (!this.editInvoiceDoc?.name) return;
+			const silent = Boolean(options?.silent);
+			this.clearScheduledEditPreview();
+			const requestId = Number(this.editPreviewRequestId || 0) + 1;
+			this.editPreviewRequestId = requestId;
+			this.editPreviewLoading = true;
+			this.editPreviewDirty = false;
+			this.editError = "";
+			try {
+				const args = {
+					...this.editScopeArgs(this.editInvoiceDoc),
+					correction_data: JSON.stringify(this.buildEditCorrectionData()),
+				};
+				const { message } = await frappe.call({
+					method: "posawesome.posawesome.api.invoices.preview_submitted_invoice_edit",
+					args,
+				});
+				if (requestId !== this.editPreviewRequestId) return;
+				this.editPreviewDoc = message?.invoice || null;
+				if (this.editPreviewDoc) {
+					this.syncEditPaymentsToCorrectedTotal(
+						this.editPreviewDoc.rounded_total || this.editPreviewDoc.grand_total || 0,
+						this.editPreviewDoc,
+					);
+				}
+				this.editEligibility = message?.metadata || this.editEligibility;
+				this.editPreviewLastUpdatedAt = Date.now();
+			} catch (error) {
+				if (requestId !== this.editPreviewRequestId) return;
+				console.error("Error previewing invoice edit:", error);
+				this.editError = error?.message || __("Unable to recalculate invoice");
+				if (!silent) this.toastStore.show({ title: this.editError, color: "error" });
+			} finally {
+				if (requestId === this.editPreviewRequestId) {
+					this.editPreviewLoading = false;
+				}
+			}
+		},
+		async submitEditInvoice() {
+			if (!this.editInvoiceDoc?.name || this.editSubmitting) return;
+			this.clearScheduledEditPreview();
+			if (isOffline()) {
+				this.toastStore.show({
+					title: __("Editing submitted invoices requires an online connection"),
+					color: "warning",
+				});
+				return;
+			}
+			if (
+				!window.confirm(
+					__("Cancel {0} and submit a corrected amendment?", [this.editInvoiceDoc.name]),
+				)
+			) {
+				return;
+			}
+			this.editSubmitting = true;
+			this.editError = "";
+			try {
+				if (this.editPreviewDirty || !this.editPreviewDoc) {
+					await this.previewEditInvoice({ silent: true });
+				}
+				if (this.editError) {
+					return;
+				}
+				this.syncEditPaymentsToCorrectedTotal();
+				const clientRequestId = [
+					"submitted-edit",
+					this.editInvoiceDoc.name,
+					Date.now(),
+					Math.random().toString(16).slice(2),
+				].join("-");
+				const { message } = await frappe.call({
+					method: "posawesome.posawesome.api.invoices.submit_submitted_invoice_edit",
+					args: {
+						...this.editScopeArgs(this.editInvoiceDoc),
+						correction_data: JSON.stringify(this.buildEditCorrectionData()),
+						client_request_id: clientRequestId,
+					},
+					freeze: true,
+					freeze_message: __("Submitting corrected invoice"),
+				});
+				const amendedName = message?.name || __("new invoice");
+				this.toastStore.show({
+					title: __("Corrected invoice {0} submitted", [amendedName]),
+					color: "success",
+				});
+				this.closeEditInvoice();
+				await this.refreshAll();
+			} catch (error) {
+				console.error("Error submitting invoice edit:", error);
+				this.editError = error?.message || __("Unable to submit corrected invoice");
+				this.toastStore.show({ title: this.editError, color: "error" });
+			} finally {
+				this.editSubmitting = false;
 			}
 		},
 		async loadDraft(invoice) {
@@ -2614,7 +3803,8 @@ export default {
 			const printFormat = profile.print_format_for_online || profile.print_format || "Standard";
 			const letterHead = profile.letter_head || 0;
 			const debugPrint = isDebugPrintEnabled();
-			const useSilentPrint = !!profile.posa_silent_print;
+			const useConfiguredQzPrint = shouldUseConfiguredQzDocumentPrinting(profile);
+			const useRawPrint = shouldUseRawDocumentPrinting(profile);
 			let url =
 				frappe.urllib.get_base_url() +
 				"/printview?doctype=" +
@@ -2628,26 +3818,89 @@ export default {
 			if (letterHead) url += "&letterhead=" + encodeURIComponent(letterHead);
 			url = appendDebugPrintParam(url, debugPrint);
 			const printOptions = { allowOfflineFallback: isOffline(), triggerPrint: "1", debugPrint };
-			if (useSilentPrint && !isOffline()) {
+			if (useConfiguredQzPrint && !isOffline()) {
 				try {
-					await printDocumentViaQz({
+					await printDocumentViaConfiguredQz({
 						doctype,
 						name: invoice.name,
+						doc: invoice,
+						profile,
 						printFormat,
 						letterhead: letterHead || null,
 						noLetterhead: letterHead ? "0" : "1",
 					});
 					return;
 				} catch (error) {
-					console.warn("QZ Tray print failed, falling back to browser print", error);
+					console.warn("QZ Tray print failed", error);
+					if (confirmDocumentPrintFallback(error, { raw: useRawPrint })) {
+						silentPrint(url, printOptions);
+					}
+					return;
 				}
 			}
-			if (useSilentPrint) {
+			if (useRawPrint) {
+				const offlineError = new Error(__("Raw printing is not available while the POS is offline."));
+				if (confirmDocumentPrintFallback(offlineError, { raw: true, offline: true })) {
+					silentPrint(url, printOptions);
+				}
+				return;
+			}
+			if (useConfiguredQzPrint) {
 				silentPrint(url, printOptions);
 				return;
 			}
 			const printWindow = window.open(url, "Print");
 			if (printWindow) watchPrintWindow(printWindow, printOptions);
+		},
+		async shareInvoice(invoice) {
+			if (this.isSharingInvoice) return;
+			this.isSharingInvoice = true;
+			try {
+				const profile = this.posProfile;
+				if (!invoice?.name || !profile) return;
+				const doctype = invoice.doctype || this.currentInvoiceDoctype;
+				const printFormat = profile.print_format_for_online || profile.print_format || "Standard";
+				const pdf_url = buildInvoicePdfUrl({ doctype, name: invoice.name, format: printFormat });
+				const response = await fetch(pdf_url, {
+					headers: { "X-Frappe-CSRF-Token": frappe.csrf_token },
+				});
+				if (!response.ok)
+					throw new Error(__("Failed to download invoice. Status: {0}", [response.status]));
+				const blob = await response.blob();
+				const file = new File([blob], `${invoice.name}.pdf`, { type: "application/pdf" });
+				if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+					try {
+						await navigator.share({
+							title: __("Sales Invoice"),
+							text: __("Invoice No: {0}", [invoice.name]),
+							files: [file],
+						});
+					} catch (shareError) {
+						if (shouldDownloadPdfForShareError(shareError)) {
+							this.downloadInvoicePdf(blob, invoice.name);
+						}
+					}
+				} else {
+					this.downloadInvoicePdf(blob, invoice.name);
+				}
+			} catch (error) {
+				this.eventBus?.emit?.("show_message", {
+					title: error.message || __("Failed to share invoice"),
+					color: "error",
+				});
+			} finally {
+				this.isSharingInvoice = false;
+			}
+		},
+		downloadInvoicePdf(blob, name) {
+			const url = window.URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = `${name}.pdf`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			window.URL.revokeObjectURL(url);
 		},
 	},
 };
@@ -3155,6 +4408,93 @@ export default {
 	color: rgb(248, 250, 252);
 }
 
+.edit-form-grid,
+.edit-add-row {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+	align-items: center;
+}
+
+.edit-add-row {
+	grid-template-columns: minmax(180px, 1fr) minmax(90px, 120px) minmax(110px, 140px) auto;
+}
+
+.edit-invoice-table {
+	border-radius: 8px;
+	overflow: hidden;
+}
+
+.edit-settlement-summary {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	border-radius: 8px;
+	padding: 12px 16px;
+	border: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.edit-settlement-summary__label {
+	font-size: 0.74rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	color: var(--pos-text-secondary);
+}
+
+.edit-settlement-summary__value,
+.edit-settlement-summary__amount {
+	font-weight: 800;
+	color: var(--pos-text-primary);
+}
+
+.edit-settlement-summary__amount {
+	font-size: 1.1rem;
+	white-space: nowrap;
+}
+
+.edit-settlement-summary--collect {
+	background: linear-gradient(135deg, rgba(236, 253, 245, 0.98), rgba(209, 250, 229, 0.9));
+	border-color: rgba(34, 197, 94, 0.3);
+}
+
+.edit-settlement-summary--refund {
+	background: linear-gradient(135deg, rgba(255, 247, 237, 0.98), rgba(254, 215, 170, 0.9));
+	border-color: rgba(249, 115, 22, 0.34);
+}
+
+.edit-settlement-summary--balanced {
+	background: rgba(248, 250, 252, 0.78);
+}
+
+.edit-number-input {
+	min-width: 96px;
+	max-width: 140px;
+}
+
+.edit-keyboard-box {
+	position: relative;
+	outline: 3px solid rgb(var(--v-theme-primary)) !important;
+	outline-offset: 2px;
+	border-radius: 6px;
+	z-index: 4;
+}
+
+.edit-invoice-table .edit-keyboard-box {
+	outline-offset: 1px;
+}
+
+.edit-keyboard-box :deep(.v-field) {
+	box-shadow:
+		0 0 0 2px rgba(var(--v-theme-primary), 0.2),
+		inset 0 0 0 2px rgb(var(--v-theme-primary));
+}
+
+.edit-item-title {
+	font-weight: 700;
+	line-height: 1.25;
+}
+
 @media (max-width: 960px) {
 	.invoice-management-card {
 		max-height: 100vh;
@@ -3173,6 +4513,13 @@ export default {
 	}
 	.invoice-management-footer :deep(.v-btn) {
 		flex: 1;
+	}
+	.edit-form-grid,
+	.edit-add-row {
+		grid-template-columns: 1fr;
+	}
+	.edit-number-input {
+		max-width: none;
 	}
 }
 

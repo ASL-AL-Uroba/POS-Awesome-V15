@@ -2,7 +2,13 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ELECTRON_ARTIFACT_EXTENSIONS = new Set([".exe", ".msi", ".AppImage", ".dmg", ".zip"]);
+const ELECTRON_ARTIFACT_EXTENSIONS = new Set([
+	".exe",
+	".msi",
+	".AppImage",
+	".dmg",
+	".zip",
+]);
 
 async function requireFile(filePath, label) {
 	let fileStat;
@@ -32,7 +38,10 @@ async function listElectronArtifacts(distDir) {
 	}
 }
 
-export async function verifyElectronPackage({ rootDir = process.cwd(), requireArtifact = false } = {}) {
+export async function verifyElectronPackage({
+	rootDir = process.cwd(),
+	requireArtifact = false,
+} = {}) {
 	const packagePath = path.resolve(rootDir, "package.json");
 	await requireFile(packagePath, "package.json");
 
@@ -45,7 +54,37 @@ export async function verifyElectronPackage({ rootDir = process.cwd(), requireAr
 
 	const buildConfig = packageJson.build || {};
 	if (buildConfig.appId !== "com.posawesome.desktop") {
-		throw new Error("package.json build.appId must remain com.posawesome.desktop");
+		throw new Error(
+			"package.json build.appId must remain com.posawesome.desktop",
+		);
+	}
+	if (buildConfig.productName !== "POS Awesome Desktop") {
+		throw new Error(
+			"package.json build.productName must be POS Awesome Desktop",
+		);
+	}
+	if (
+		buildConfig.win?.artifactName !==
+		"POSAwesome-Setup-${version}.${ext}"
+	) {
+		throw new Error(
+			"Windows artifact name must use the POS Awesome brand",
+		);
+	}
+	if (
+		buildConfig.linux?.artifactName !== "POSAwesome-${version}.${ext}"
+	) {
+		throw new Error(
+			"Linux artifact name must use the POS Awesome brand",
+		);
+	}
+	const posProtocol = buildConfig.protocols?.find((protocol) =>
+		protocol.schemes?.includes("posawesome"),
+	);
+	if (!posProtocol || posProtocol.name !== "POS Awesome Links") {
+		throw new Error(
+			"The stable posawesome protocol scheme must use the POS Awesome display name",
+		);
 	}
 	if (!buildConfig.directories?.output) {
 		throw new Error("package.json build.directories.output is required");
@@ -72,7 +111,9 @@ async function main() {
 	const result = await verifyElectronPackage({ requireArtifact });
 	console.log(`Verified Electron package config (${result.mainPath})`);
 	if (requireArtifact) {
-		console.log(`Verified ${result.artifacts.length} Electron package artifact(s)`);
+		console.log(
+			`Verified ${result.artifacts.length} Electron package artifact(s)`,
+		);
 	}
 }
 

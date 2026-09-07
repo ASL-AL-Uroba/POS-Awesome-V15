@@ -17,7 +17,7 @@ objects so they can be used in both component code and unit tests.
 
 > **formatBootstrapWarning**(`code`, `translate?`): `string`
 
-Defined in: [posapp/utils/bootstrapWarnings.ts:24](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/047e5ede7485810fc256de54036e4e18c05b1b7b/frontend/src/posapp/utils/bootstrapWarnings.ts#L24)
+Defined in: [posapp/utils/bootstrapWarnings.ts:24](https://github.com/defendicon/POS-Awesome-V15/blob/1a8d649598a68f99d68ab251862b8e08a88f0e4e/frontend/src/posapp/utils/bootstrapWarnings.ts#L24)
 
 Maps a prerequisite warning code to a translated human-readable message.
 
@@ -52,7 +52,7 @@ Translated user-facing message string.
 
 > **shouldShowBootstrapBanner**(`status`): `boolean`
 
-Defined in: [posapp/utils/bootstrapWarnings.ts:106](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/047e5ede7485810fc256de54036e4e18c05b1b7b/frontend/src/posapp/utils/bootstrapWarnings.ts#L106)
+Defined in: [posapp/utils/bootstrapWarnings.ts:106](https://github.com/defendicon/POS-Awesome-V15/blob/1a8d649598a68f99d68ab251862b8e08a88f0e4e/frontend/src/posapp/utils/bootstrapWarnings.ts#L106)
 
 Returns `true` when the persisted bootstrap status warrants showing the offline warning
 banner in the navbar.

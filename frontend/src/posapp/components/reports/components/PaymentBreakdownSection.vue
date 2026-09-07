@@ -59,11 +59,22 @@
 						<div v-if="methodRows.length" class="list-stack trend-list">
 							<InsightRow
 								v-for="row in methodRows"
-								:key="`pay-method-${row.mode_of_payment}`"
-								:title="row.mode_of_payment"
-								:value="formatMoney(Number(row.amount || 0))"
+								:key="`pay-method-${row.mode_of_payment}-${row.currency || ''}`"
+								:title="
+									row.currency
+										? `${row.mode_of_payment} · ${row.currency}`
+										: row.mode_of_payment
+								"
+								:value="
+									formatMoneyInCurrency(
+										Number(row.tender_amount ?? row.amount ?? 0),
+										row.currency,
+									)
+								"
 							>
 								<template #meta>
+									{{ __("Company equivalent") }}:
+									{{ formatMoney(Number(row.company_currency_amount ?? row.amount ?? 0)) }} .
 									{{ __("Category") }}: {{ row.category || "-" }} .
 									{{ __("Invoices") }}:
 									{{ formatQuantity(Number(row.invoice_count || 0)) }} .
@@ -124,6 +135,7 @@ defineProps<{
 	dayRows: DashboardRow[];
 	dayMax: number;
 	formatMoney: (value: number) => string;
+	formatMoneyInCurrency: (value: number, currency?: string) => string;
 	formatQuantity: (value: number) => string;
 	formatDate: (value?: string) => string;
 	formatPercent: (value?: number | null, digits?: number) => string;

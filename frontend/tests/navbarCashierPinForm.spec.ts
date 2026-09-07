@@ -94,6 +94,26 @@ describe("NavbarCashierPinForm", () => {
 		);
 	});
 
+	it("prevents saved credentials from autofilling cashier PIN fields", async () => {
+		frappeCall.mockResolvedValue({ message: { has_pin: true } });
+		const wrapper = mountForm({
+			posProfile: { name: "Main POS" },
+			currentCashier: { user: "cashier@example.com" },
+			currentCashierDisplay: "Main Cashier",
+		});
+
+		await flushPromises();
+		const inputs = wrapper.findAll(".navbar-cashier-pin-form__input");
+		expect(inputs).toHaveLength(3);
+		inputs.forEach((input) => {
+			expect(input.attributes("autocomplete")).toBe("one-time-code");
+			expect(input.attributes("inputmode")).toBe("numeric");
+			expect(input.attributes("data-1p-ignore")).toBe("true");
+			expect(input.attributes("data-lpignore")).toBe("true");
+			expect(input.attributes("data-bwignore")).toBe("true");
+		});
+	});
+
 	it("shows validation error when the new pin is invalid", async () => {
 		frappeCall.mockResolvedValue({
 			message: {

@@ -1,4 +1,12 @@
-import { checkDbHealth, db, initPromise, memory, persist, safeBulkPut } from "./db";
+import {
+	db,
+	memory,
+	persist,
+	registerPostHydrationTask,
+	safeBulkPut,
+	startupInitPromise,
+} from "./db";
+import { markWriteQueueEntrySyncedByIdempotencyKey } from "./writeQueue";
 
 type AnyRecord = Record<string, any>;
 
@@ -28,6 +36,7 @@ export interface InvoiceOutboxEntry {
 }
 
 const TABLE = "invoice_outbox";
+const JOURNAL_PREFIX = "posa_invoice_intent_";
 const MAX_RETRY_COUNT = 5;
 const INITIAL_BACKOFF_MS = 5_000;
 const MAX_BACKOFF_MS = 5 * 60 * 1_000;
@@ -55,8 +64,9 @@ function toErrorMessage(error: unknown) {
 }
 
 async function ensureOutboxReady() {
-	await initPromise;
-	await checkDbHealth();
+	if (!db.isOpen()) {
+		await startupInitPromise;
+	}
 	if (!db.isOpen()) {
 		await db.open();
 	}
@@ -85,6 +95,53 @@ function getClientRequestId(entry: AnyRecord) {
 	).trim();
 }
 
+function journalKey(clientRequestId: string) {
+	return `${JOURNAL_PREFIX}${encodeURIComponent(clientRequestId)}`;
+}
+
+export function persistInvoiceIntentJournal(entry: AnyRecord) {
+	const cleanEntry = cloneSerializable(entry);
+	const clientRequestId = getClientRequestId(cleanEntry);
+	if (!clientRequestId) {
+		throw new Error("Invoice intent journal requires a client_request_id");
+	}
+	if (typeof localStorage !== "undefined") {
+		localStorage.setItem(
+			journalKey(clientRequestId),
+			JSON.stringify(cleanEntry),
+		);
+	}
+	return clientRequestId;
+}
+
+export function removeInvoiceIntentJournal(clientRequestId: string) {
+	const normalizedId = String(clientRequestId || "").trim();
+	if (normalizedId && typeof localStorage !== "undefined") {
+		localStorage.removeItem(journalKey(normalizedId));
+	}
+}
+
+async function recoverInvoiceIntentJournal() {
+	if (typeof localStorage === "undefined") return;
+	const entries: AnyRecord[] = [];
+	for (let index = 0; index < localStorage.length; index += 1) {
+		const key = localStorage.key(index);
+		if (!key?.startsWith(JOURNAL_PREFIX)) continue;
+		try {
+			const entry = JSON.parse(localStorage.getItem(key) || "null");
+			if (entry) entries.push(entry);
+		} catch (error) {
+			console.warn(
+				"Ignoring invalid invoice intent journal entry",
+				error,
+			);
+		}
+	}
+	for (const entry of entries) {
+		await enqueueInvoiceOutboxEntry(entry);
+	}
+}
+
 export async function enqueueInvoiceOutboxEntry(entry: AnyRecord) {
 	await ensureOutboxReady();
 	const cleanEntry = cloneSerializable(entry);
@@ -100,7 +157,14 @@ export async function enqueueInvoiceOutboxEntry(entry: AnyRecord) {
 			.equals(clientRequestId)
 			.first()) as InvoiceOutboxEntry | undefined;
 		if (existing) {
-			return existing;
+			const refreshed = {
+				...existing,
+				invoice: cleanEntry.invoice,
+				data: cleanEntry.data || {},
+				updated_at: nowIso(),
+			};
+			await table.put(refreshed);
+			return refreshed;
 		}
 
 		const timestamp = nowIso();
@@ -141,6 +205,19 @@ export async function getPendingInvoiceOutboxCount() {
 	return (await getInvoiceOutboxRows()).length;
 }
 
+export async function removeInvoiceOutboxEntry(clientRequestId: string) {
+	const normalizedId = String(clientRequestId || "").trim();
+	if (!normalizedId) return 0;
+	await ensureOutboxReady();
+	const deleted = await db
+		.table(TABLE)
+		.where("client_request_id")
+		.equals(normalizedId)
+		.delete();
+	removeInvoiceIntentJournal(normalizedId);
+	return deleted;
+}
+
 function shouldAttempt(row: InvoiceOutboxEntry) {
 	if (TERMINAL_STATUSES.has(row.status)) return false;
 	if (!row.next_retry_at) return true;
@@ -175,7 +252,10 @@ function markOutboxAcknowledged(
 	};
 }
 
-function markOutboxFailed(row: InvoiceOutboxEntry, error: unknown): InvoiceOutboxEntry {
+function markOutboxFailed(
+	row: InvoiceOutboxEntry,
+	error: unknown,
+): InvoiceOutboxEntry {
 	const retryCount = Number(row.retry_count || 0) + 1;
 	const status: InvoiceOutboxStatus =
 		retryCount >= MAX_RETRY_COUNT ? "dead_letter" : "retrying";
@@ -242,6 +322,16 @@ export async function syncInvoiceOutboxResource(
 	}
 	if (finalRows.length) {
 		await safeBulkPut(TABLE, finalRows);
+		const acknowledgedRows = finalRows.filter(
+			(row) => row.status === "acknowledged",
+		);
+		for (const row of acknowledgedRows) {
+			removeInvoiceIntentJournal(row.client_request_id);
+			await markWriteQueueEntrySyncedByIdempotencyKey(
+				"invoice",
+				`invoice:${row.client_request_id}`,
+			);
+		}
 	}
 
 	const pending = await getPendingInvoiceOutboxCount();
@@ -258,3 +348,5 @@ export async function syncInvoiceOutboxResource(
 		acknowledged,
 	};
 }
+
+registerPostHydrationTask(recoverInvoiceIntentJournal);

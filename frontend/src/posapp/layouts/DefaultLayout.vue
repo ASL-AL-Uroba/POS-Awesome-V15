@@ -27,6 +27,7 @@
 				@nav-click="handleNavClick"
 				@close-shift="handleCloseShift"
 				@print-last-invoice="handlePrintLastInvoice"
+				@share-last-invoice="handleShareLastInvoice"
 				@sync-invoices="handleSyncInvoices"
 				@toggle-offline="handleToggleOffline"
 				@retry-status="handleRetryStatus"
@@ -88,12 +89,20 @@ import AppLoadingOverlay from "../components/ui/LoadingOverlay.vue";
 import UpdatePrompt from "../components/ui/UpdatePrompt.vue";
 import { useLoading } from "../composables/core/useLoading.js";
 import { usePosShift } from "../composables/pos/shared/usePosShift";
-import { loadingState, initLoadingSources, setSourceProgress, markSourceLoaded } from "../utils/loading.js";
+import {
+	clearSourceRelease,
+	initLoadingSources,
+	loadingState,
+	markSourceLoaded,
+	scheduleSourceRelease,
+	setSourceProgress,
+} from "../utils/loading.js";
 import { useCustomersStore } from "../stores/customersStore.js";
 import { useSyncStore } from "../stores/syncStore.js";
 import { useToastStore } from "../stores/toastStore.js";
 import { useUIStore } from "../stores/uiStore.js";
 import { useUpdateStore } from "../stores/updateStore.js";
+import { finishStartupPhase, startStartupPhase, traceStartupEvent } from "../../utils/startupTrace";
 import { useItemsStore } from "../stores/itemsStore.js";
 import { usePricingRulesStore } from "../stores/pricingRulesStore";
 import { useOfflineSyncStore } from "../stores/offlineSyncStore";
@@ -111,7 +120,7 @@ import {
 	queueHealthCheck,
 	purgeOldQueueEntries,
 	initPromise,
-	memoryInitPromise,
+	startupInitPromise,
 	ensureOfflineQueueReady,
 	toggleManualOffline,
 	isManualOffline as getIsManualOffline,
@@ -124,6 +133,7 @@ import {
 	getSyncResourceDefinitions,
 	getSyncResourceState,
 	listSyncResourceStates,
+	setTaxInclusiveSetting,
 } from "../../offline/index";
 import { SyncCoordinator } from "../../offline/sync/SyncCoordinator";
 import { createOfflineSyncRuntime } from "../../offline/sync/runtime";
@@ -149,9 +159,11 @@ import { getValidCachedOpeningForCurrentUser } from "../utils/openingCache";
 import { formatBootstrapWarning, shouldShowBootstrapBanner } from "../utils/bootstrapWarnings";
 import { listenForBootstrapSnapshotUpdates } from "../utils/bootstrapRuntimeEvents";
 import {
+	isOfflineSaleModeConfirmed,
 	resolveBootstrapWarningUiState,
 	shouldLiftBootstrapWarningStartupGate,
 } from "../utils/bootstrapWarningVisibility";
+import { resolveOfflineQueueReadiness } from "../utils/offlineQueueReadiness";
 
 /**
  * Frappe Desk UI selectors to hide in POS view.
@@ -181,8 +193,10 @@ const instance = getCurrentInstance();
 const $theme = instance?.proxy?.$theme || { toggle: () => {}, isDark: false }; // Fallback
 const __ = instance?.proxy?.__ || ((value) => value);
 const BUILD_VERSION = typeof __BUILD_VERSION__ !== "undefined" ? __BUILD_VERSION__ : null;
-const OFFLINE_SYNC_SCHEMA_VERSION = "2026-04-09";
 const OFFLINE_SYNC_TIMER_INTERVAL_MS = 60_000;
+const PRODUCT_SYNC_SETTLE_TIMEOUT_MS = 120_000;
+const PRODUCT_SYNC_SETTLE_POLL_MS = 250;
+const PRODUCT_CATALOG_BOOTSTRAP_GRACE_MS = 20_000;
 
 // Utils
 const createFallbackLoadingScope = () =>
@@ -219,7 +233,7 @@ const pricingRulesStore = usePricingRulesStore();
 const { posProfile, lastInvoiceId, posOpeningShift } = storeToRefs(uiStore);
 
 const { pendingInvoicesCount } = storeToRefs(syncStore);
-const { loadProgress, customersLoaded } = storeToRefs(customersStore);
+const { loadProgress, customersLoaded, selectedCustomer } = storeToRefs(customersStore);
 const {
 	itemsLoaded,
 	isBackgroundLoading: itemsBackgroundLoading,
@@ -247,7 +261,9 @@ const offlineSyncRuntime = createOfflineSyncRuntime({
 // Network status
 const networkOnline = ref(navigator.onLine || false);
 const serverOnline = ref(false);
-const serverConnecting = ref(false);
+// Until the first health probe settles, an online browser is "Checking", not
+// "Server Offline". This avoids misclassifying a storage-bound cold start.
+const serverConnecting = ref(Boolean(navigator.onLine));
 const internetReachable = ref(false);
 const isIpHost = ref(false);
 
@@ -280,17 +296,35 @@ const bootstrapSnackbarVisible = ref(false);
 const confirmedBootstrapDecisionKey = ref("");
 const initialBootstrapSyncSettled = ref(false);
 const startupBootstrapWarningsReady = ref(false);
+const offlineQueueInitializationError = ref(null);
 const startupOfflineWarmupInFlight = ref(false);
 const startupOfflineWarmupKey = ref("");
 let _sidebarObserver = null;
 let _navPollTimer = null;
 let removeBootstrapSnapshotListener = null;
+let cacheCapacityWarningShown = false;
 
 // Event Bus
 const eventBus = instance?.proxy?.eventBus;
 
 // Initialize loading sources immediately in setup so watchers can mark them 100%
 initLoadingSources(["init", "items", "customers"]);
+scheduleSourceRelease("items", PRODUCT_CATALOG_BOOTSTRAP_GRACE_MS, () => {
+	if (itemsLoaded.value) return;
+	traceStartupEvent("ui.product_catalog_progress", "timeout", {
+		progress: itemsLoadProgress.value,
+		itemCount: itemsStore.items.length,
+		backgroundLoading: itemsBackgroundLoading.value,
+	});
+	console.warn("Product catalog is still loading; releasing the startup progress surface.");
+	toastStore.show({
+		title: __("Product catalog is still loading"),
+		detail: __(
+			"The catalog is not ready yet. Loading continues in the background; retry the catalog if products remain unavailable.",
+		),
+		color: "warning",
+	});
+});
 
 const bootSync = useBootSync({
 	offlineSyncRuntime,
@@ -332,6 +366,20 @@ const customerReadiness = useCustomerReadiness({
 		}
 	},
 });
+
+function ensureStartupItemsReady(profile) {
+	if (!profile?.name) {
+		return;
+	}
+
+	const customer = selectedCustomer.value || profile.customer || null;
+	const priceList = profile.selling_price_list || null;
+
+	void startupInitPromise;
+	void itemsStore.initialize(profile, customer, priceList).catch((error) => {
+		console.error("Failed to initialize POS item catalog", error);
+	});
+}
 
 function getCurrentBootstrapProfile() {
 	return posProfile.value || frappe?.boot?.pos_profile || null;
@@ -485,6 +533,48 @@ function canRunTimerOfflineSync() {
 	return !!(canRunOfflineSync() && serverOnline.value && !serverConnecting.value);
 }
 
+function waitForItemsBackgroundSync(timeoutMs = PRODUCT_SYNC_SETTLE_TIMEOUT_MS) {
+	return new Promise((resolve) => {
+		const startedAt = Date.now();
+		const poll = () => {
+			if (!itemsBackgroundLoading.value) {
+				resolve(true);
+				return;
+			}
+			if (Date.now() - startedAt >= timeoutMs) {
+				resolve(false);
+				return;
+			}
+			setTimeout(poll, PRODUCT_SYNC_SETTLE_POLL_MS);
+		};
+		poll();
+	});
+}
+
+async function refreshOfflineProductCatalog() {
+	const profile = getCurrentBootstrapProfile();
+	if (!profile?.name || !canRunOfflineSync()) {
+		return false;
+	}
+
+	try {
+		await startupInitPromise;
+		if (!itemsStore.posProfile?.name) {
+			await itemsStore.initialize(
+				profile,
+				selectedCustomer.value || profile.customer || null,
+				profile.selling_price_list || null,
+			);
+		}
+		await itemsStore.refreshItems();
+		await waitForItemsBackgroundSync();
+		return true;
+	} catch (error) {
+		console.error("Failed to refresh offline product catalog", error);
+		return false;
+	}
+}
+
 async function callOfflineSyncMethod(method, args = {}) {
 	if (typeof frappe === "undefined" || typeof frappe.call !== "function") {
 		throw new Error("Frappe call API is unavailable");
@@ -507,7 +597,6 @@ async function runOfflineSyncResource(resource) {
 	return runSupportedOfflineSyncResource({
 		resource,
 		posProfile: profile,
-		schemaVersion: OFFLINE_SYNC_SCHEMA_VERSION,
 		getPersistedState: getSyncResourceState,
 		getRuntimeState: (resourceId) => syncCoordinator.getResourceState(resourceId),
 		callOfflineSyncMethod,
@@ -595,6 +684,7 @@ const loadingProgress = computed(() => {
 	return 0;
 });
 const bootstrapAlertType = computed(() =>
+	offlineQueueInitializationError.value ||
 	bootstrapStatus.value?.primary_warning?.severity === "error" ||
 	bootstrapStatus.value?.runtime_mode === "invalid"
 		? "error"
@@ -602,6 +692,9 @@ const bootstrapAlertType = computed(() =>
 );
 const bootstrapCapabilitySummaries = computed(() => bootstrapStatus.value?.capability_summaries || []);
 const bootstrapWarningTitle = computed(() => {
+	if (offlineQueueInitializationError.value) {
+		return __("Sell Offline");
+	}
 	if (bootstrapStatus.value?.primary_warning?.title) {
 		return __(bootstrapStatus.value.primary_warning.title);
 	}
@@ -614,22 +707,36 @@ const bootstrapWarningTitle = computed(() => {
 	return "";
 });
 const bootstrapWarningMessages = computed(() => {
-	if (!shouldShowBootstrapBanner(bootstrapStatus.value)) {
-		return [];
+	const messages = [];
+	if (offlineQueueInitializationError.value) {
+		messages.push(
+			__("Offline invoice storage is unavailable. Stay online until browser storage is restored."),
+		);
 	}
 
-	if (Array.isArray(bootstrapStatus.value?.primary_warning?.messages)) {
-		return bootstrapStatus.value.primary_warning.messages.map((message) => __(message));
+	if (shouldShowBootstrapBanner(bootstrapStatus.value)) {
+		if (Array.isArray(bootstrapStatus.value?.primary_warning?.messages)) {
+			messages.push(...bootstrapStatus.value.primary_warning.messages.map((message) => __(message)));
+		} else {
+			messages.push(
+				...(bootstrapStatus.value?.warning_codes || []).map((code) =>
+					formatBootstrapWarning(code, __),
+				),
+			);
+		}
 	}
 
-	return Array.from(
-		new Set((bootstrapStatus.value?.warning_codes || []).map((code) => formatBootstrapWarning(code, __))),
-	);
+	return Array.from(new Set(messages));
 });
 const bootstrapWarningActive = computed(() => bootstrapWarningMessages.value.length > 0);
 const bootstrapRecoveryMessage = computed(() => {
 	if (!bootstrapWarningActive.value) {
 		return "";
+	}
+	if (offlineQueueInitializationError.value) {
+		return __(
+			"Free browser storage or enable site storage, then run Refresh Offline Data before selling offline.",
+		);
 	}
 
 	return __(
@@ -645,12 +752,23 @@ const bootstrapWarningTooltip = computed(() => {
 		.filter(Boolean)
 		.join("\n");
 });
+const offlineSaleModeConfirmed = computed(() =>
+	isOfflineSaleModeConfirmed({
+		manualOffline: manualOffline.value || getIsManualOffline(),
+		browserOnline: navigator.onLine,
+		networkOnline: networkOnline.value,
+		serverOnline: serverOnline.value,
+		serverConnecting: serverConnecting.value,
+		serverStatusKnown: typeof window.serverOnline === "boolean",
+	}),
+);
 const bootstrapWarningUiState = computed(() =>
 	resolveBootstrapWarningUiState({
 		startupWarningsReady: startupBootstrapWarningsReady.value,
 		warningActive: bootstrapWarningActive.value,
 		warningTooltip: bootstrapWarningTooltip.value,
 		capabilitySummaries: bootstrapCapabilitySummaries.value,
+		offlineSaleModeConfirmed: offlineSaleModeConfirmed.value,
 	}),
 );
 const visibleBootstrapWarningActive = computed(() => bootstrapWarningUiState.value.active);
@@ -692,6 +810,14 @@ watch(
 );
 
 watch(
+	posProfile,
+	(profile) => {
+		ensureStartupItemsReady(profile);
+	},
+	{ deep: true, immediate: true },
+);
+
+watch(
 	() => [
 		initialBootstrapSyncSettled.value,
 		startupBootstrapWarningsReady.value,
@@ -703,13 +829,7 @@ watch(
 		posProfile.value?.selling_price_list || null,
 		posProfile.value?.currency || null,
 	],
-	([
-		isInitialSyncSettled,
-		areWarningsReady,
-		isNetworkOnline,
-		isServerOnline,
-		isServerConnecting,
-	]) => {
+	([isInitialSyncSettled, areWarningsReady, isNetworkOnline, isServerOnline, isServerConnecting]) => {
 		if (
 			isInitialSyncSettled &&
 			areWarningsReady &&
@@ -818,6 +938,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+	clearSourceRelease("items");
 	updateChecks.stop();
 	if (removeBootstrapSnapshotListener) {
 		removeBootstrapSnapshotListener();
@@ -865,10 +986,69 @@ const pollForFrappeNav = (maxAttempts = 50, interval = 100) => {
 	checkAndRemove();
 };
 
+const notifyCacheCapacityIfActionable = (usage = {}) => {
+	const pendingInvoices = getPendingOfflineInvoiceCount();
+	const pendingCashMovements = getPendingOfflineCashMovementCount();
+	const pendingTotal = pendingInvoices + pendingCashMovements;
+	if (cacheCapacityWarningShown || pendingTotal <= 0) {
+		return;
+	}
+
+	cacheCapacityWarningShown = true;
+	const offlineNow = isOffline();
+	toastStore.show({
+		title: __("Local cache usage is high"),
+		detail: offlineNow
+			? __("Reconnect online to sync {0} pending local record(s). Cache usage is {1}%.", [
+					pendingTotal,
+					Math.round(usage.percentage || 0),
+				])
+			: __("Sync {0} pending local record(s). Cache usage is {1}%.", [
+					pendingTotal,
+					Math.round(usage.percentage || 0),
+				]),
+		color: "warning",
+	});
+};
+
+const initializeOfflineQueueReadiness = async () => {
+	const result = await resolveOfflineQueueReadiness(() => ensureOfflineQueueReady());
+	offlineQueueInitializationError.value = result.error;
+	if (!result.ready) {
+		console.error(
+			"Offline invoice storage is unavailable; continuing the online POS bootstrap",
+			result.error,
+		);
+	}
+	return result.ready;
+};
+
+const finishInitialOfflineResourceSync = async () => {
+	const phase = startStartupPhase("offline.initial_resource_sync");
+	try {
+		await scheduleBootCriticalWarmSync();
+		await refreshOfflinePricingRules();
+		finishStartupPhase(phase, "ok", {
+			resources: syncCoordinator.getLastRunSummary(),
+		});
+	} catch (error) {
+		console.error("Initial offline resource sync failed", error);
+		finishStartupPhase(phase, "error", { error });
+	} finally {
+		evaluateBootstrapSnapshot({ allowPrompt: false });
+		initialBootstrapSyncSettled.value = true;
+		void runStartupOfflineDataWarmup("initial_load");
+	}
+};
+
 const initializeData = async () => {
-	await initPromise;
-	await memoryInitPromise;
-	await ensureOfflineQueueReady();
+	const phase = startStartupPhase("ui.final_store_hydration");
+	await startupInitPromise;
+	void initPromise.then(
+		() => traceStartupEvent("indexeddb.full_memory_hydration", "ok"),
+		(error) => traceStartupEvent("indexeddb.full_memory_hydration", "error", { error }),
+	);
+	await initializeOfflineQueueReadiness();
 	await hydrateOfflineSyncResourceStates();
 	checkDbHealth().catch(() => {});
 	// Offline-first bootstrap: hydrate register state from IndexedDB before server checks.
@@ -881,16 +1061,16 @@ const initializeData = async () => {
 	}
 
 	if (queueHealthCheck()) {
-		alert("Offline queue is too large. Old entries will be purged.");
-		purgeOldQueueEntries();
+		const pruned = purgeOldQueueEntries();
+		if (pruned > 0) {
+			alert("Old synced offline queue entries were pruned.");
+		}
 	}
 
 	await syncStore.updatePendingCount();
 	syncTotals.value = getLastSyncTotals();
 
-	void checkCacheCapacity(90, () => {
-		alert("Local cache nearing capacity. Consider going online to sync.");
-	});
+	void checkCacheCapacity(90, notifyCacheCapacityIfActionable);
 
 	// Check if running on IP host
 	isIpHost.value = /^\d+\.\d+\.\d+\.\d+/.test(window.location.hostname);
@@ -905,13 +1085,14 @@ const initializeData = async () => {
 	evaluateBootstrapSnapshot({
 		allowPrompt: manualOffline.value || !navigator.onLine,
 	});
-	await scheduleBootCriticalWarmSync();
-	await refreshOfflinePricingRules();
-	evaluateBootstrapSnapshot({ allowPrompt: false });
-	initialBootstrapSyncSettled.value = true;
-	void runStartupOfflineDataWarmup("initial_load");
-
+	// The shell and catalog are usable at this boundary. Offline resource
+	// freshness continues independently and must not hold the startup overlay.
 	markSourceLoaded("init");
+	finishStartupPhase(phase, "ok", {
+		profile: posProfile.value?.name || null,
+		openingShift: posOpeningShift.value?.name || null,
+	});
+	void finishInitialOfflineResourceSync();
 };
 
 const setupEventListeners = () => {
@@ -947,6 +1128,10 @@ const handleNavClick = () => {
 
 const handleCloseShift = () => {
 	get_closing_data();
+};
+
+const handleShareLastInvoice = () => {
+	eventBus?.emit("share_last_invoice");
 };
 
 const handleSyncInvoices = async () => {
@@ -986,13 +1171,16 @@ const handleRetryStatus = async () => {
 
 const handleRefreshOfflineData = async () => {
 	handleRefreshCacheUsage();
+	await initializeOfflineQueueReadiness();
 	evaluateBootstrapSnapshot({
 		allowPrompt: getIsManualOffline() || !navigator.onLine,
 	});
 	if (!getIsManualOffline() && navigator.onLine) {
 		await handleRetryStatus();
 		await triggerOperatorRefreshSync();
-		await refreshOfflinePricingRules();
+		await refreshOfflineProductCatalog();
+		await refreshTaxInclusiveSetting();
+		await refreshOfflinePricingRules({ force: true });
 		evaluateBootstrapSnapshot({ allowPrompt: false });
 	}
 	toastStore.show({
@@ -1006,11 +1194,14 @@ const handleRefreshOfflineData = async () => {
 
 const handleRebuildOfflineData = async () => {
 	handleRefreshCacheUsage();
+	await initializeOfflineQueueReadiness();
 	evaluateBootstrapSnapshot({
 		allowPrompt: true,
 	});
 	if (canRunOfflineSync()) {
 		await triggerOperatorRefreshSync({ includeBootSync: true });
+		await refreshOfflineProductCatalog();
+		await refreshTaxInclusiveSetting();
 		await refreshOfflinePricingRules({ force: true });
 		evaluateBootstrapSnapshot({ allowPrompt: false });
 	}
@@ -1062,7 +1253,7 @@ const handleRefreshCacheUsage = () => {
 
 const refreshTaxInclusiveSetting = async () => {
 	if (!posProfile.value || !posProfile.value.name || !navigator.onLine) {
-		return;
+		return false;
 	}
 	try {
 		const r = await frappe.call({
@@ -1072,18 +1263,13 @@ const refreshTaxInclusiveSetting = async () => {
 			},
 		});
 		if (r.message !== undefined) {
-			const val = r.message;
-			import("../../offline/index")
-				.then((m) => {
-					if (m && m.setTaxInclusiveSetting) {
-						m.setTaxInclusiveSetting(val);
-					}
-				})
-				.catch(() => {});
+			setTaxInclusiveSetting(r.message);
+			return true;
 		}
 	} catch (e) {
 		console.warn("Failed to refresh tax inclusive setting", e);
 	}
+	return false;
 };
 
 const handleUpdateAfterDelete = () => {
@@ -1160,7 +1346,19 @@ const adjust_frappe_sidebar_offset = () => {
 	min-height: 0;
 	overflow: auto;
 	overscroll-behavior: contain;
-	padding-top: 8px;
+	padding-top: 6px;
+	background:
+		linear-gradient(
+			90deg,
+			color-mix(in srgb, var(--pos-primary-container) 18%, transparent) 1px,
+			transparent 1px
+		),
+		linear-gradient(
+			color-mix(in srgb, var(--pos-primary-container) 14%, transparent) 1px,
+			transparent 1px
+		);
+	background-size: 32px 32px;
+	background-position: -1px -1px;
 }
 
 .bootstrap-warning-snackbar :deep(.v-snackbar__wrapper) {

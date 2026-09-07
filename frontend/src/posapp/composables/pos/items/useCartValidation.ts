@@ -4,6 +4,7 @@ import {
 	parseBooleanSetting,
 	formatStockShortageError,
 	formatNegativeStockWarning,
+	shouldBlockSaleForStock,
 } from "../../../utils/stock.js";
 
 declare const __: (_text: string, _args?: any[]) => string;
@@ -49,29 +50,18 @@ export function useCartValidation() {
 				return true;
 			}
 
-			if (
-				item.actual_qty === 0 &&
-				posProfile?.posa_display_items_in_stock &&
-				!isReturnInvoice
-			) {
-				toastStore.show({
-					title: `No stock available for ${item.item_name}`,
-					color: "error",
-				});
-				return false;
-			}
-
 			const isStockItem = parseBooleanSetting(item?.is_stock_item);
 
 			if (isStockItem && !isReturnInvoice) {
-				const allowNegativeStock =
-					!blockSaleBeyondAvailableQty &&
-					(parseBooleanSetting(stockSettings?.allow_negative_stock) ||
-						parseBooleanSetting(item?.allow_negative_stock));
-				const exceedsAvailable =
-					typeof item.actual_qty === "number" &&
-					requestedQty > item.actual_qty;
-				const blockSale = !allowNegativeStock && exceedsAvailable;
+				const blockSale = shouldBlockSaleForStock({
+					item,
+					requestedQty,
+					posProfile,
+					stockSettings,
+					blockSaleBeyondAvailableQty,
+					isReturnInvoice,
+					deferStockValidationToPayment,
+				});
 
 				if (blockSale) {
 					toastStore.show({
@@ -117,10 +107,10 @@ export function useCartValidation() {
 								stockValidationResult.warning?.item_name ||
 									item.item_name ||
 									item.item_code,
-								stockValidationResult.warning
-									?.available_qty ?? item.actual_qty,
-								stockValidationResult.warning
-									?.requested_qty ?? requestedQty,
+								stockValidationResult.warning?.available_qty ??
+									item.actual_qty,
+								stockValidationResult.warning?.requested_qty ??
+									requestedQty,
 							),
 							color: "warning",
 						});
@@ -227,27 +217,14 @@ export function useCartValidation() {
 		const isStockItem = parseBooleanSetting(item?.is_stock_item);
 
 		if (isStockItem && !isReturnInvoice) {
-			const allowNegativeStock =
-				!blockSaleBeyondAvailableQty &&
-				(parseBooleanSetting(stockSettings?.allow_negative_stock) ||
-					parseBooleanSetting(item?.allow_negative_stock));
-
-			if (item.actual_qty < 0 && !allowNegativeStock) {
-				toastStore.show({
-					title: formatStockShortageError(
-						item.item_name || item.item_code,
-						item.actual_qty,
-						requestedQty,
-					),
-					color: "error",
-				});
-				return false;
-			}
-
-			const exceedsAvailable =
-				typeof item.actual_qty === "number" &&
-				requestedQty > item.actual_qty;
-			const blockSale = !allowNegativeStock && exceedsAvailable;
+			const blockSale = shouldBlockSaleForStock({
+				item,
+				requestedQty,
+				stockSettings,
+				blockSaleBeyondAvailableQty,
+				isReturnInvoice,
+				deferStockValidationToPayment,
+			});
 			if (blockSale) {
 				toastStore.show({
 					title: formatStockShortageError(

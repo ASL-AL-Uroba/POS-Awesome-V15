@@ -4,6 +4,7 @@ import { perfMarkStart, perfMarkEnd } from "../../../utils/perf";
 import {
 	formatStockShortageError,
 	parseBooleanSetting,
+	shouldBlockSaleForStock,
 } from "../../../utils/stock";
 import { saveItems, savePriceListItems } from "../../../../offline/index";
 import { openItemSelectionDialog } from "../../../utils/itemSelectionDialog";
@@ -12,6 +13,7 @@ import {
 	emptyScanAssignment,
 	type ScanAssignment,
 } from "./scanProcessor/scanAssignment";
+import { toCompanyCurrency } from "../../../utils/erpnextCurrency";
 // @ts-ignore
 import placeholderImage from "../../../components/pos/placeholder-image.png";
 
@@ -45,7 +47,10 @@ export interface ScanProcessorContext {
 	float_precision: ComputedRef<number>;
 	hide_qty_decimals: ComputedRef<boolean>;
 	blockSaleBeyondAvailableQty: ComputedRef<boolean>;
-	deferStockValidationToPayment?: ComputedRef<boolean> | Ref<boolean> | boolean;
+	deferStockValidationToPayment?:
+		| ComputedRef<boolean>
+		| Ref<boolean>
+		| boolean;
 	currency_precision: ComputedRef<number>;
 	exchange_rate: ComputedRef<number>;
 	format_currency: (
@@ -102,16 +107,6 @@ export function useScanProcessor(context: ScanProcessorContext) {
 	const pendingScanCode = ref("");
 	const logScanFlow = (step: string, payload?: any) => {
 		console.debug(`[POS ScanFlow] ${step}`, payload || {});
-	};
-
-	const isNegativeStockEnabled = (item: any = null) => {
-		const allowNegativeSetting = parseBooleanSetting(
-			context.stock_settings.value?.allow_negative_stock,
-		);
-		const allowNegativeItem = item
-			? parseBooleanSetting(item.allow_negative_stock)
-			: false;
-		return allowNegativeSetting || allowNegativeItem;
 	};
 
 	const isReturnMode = () => {
@@ -293,16 +288,15 @@ export function useScanProcessor(context: ScanProcessorContext) {
 		if (effectivePrice !== null && !Number.isNaN(effectivePrice)) {
 			const parsedPrice = parseFloat(String(effectivePrice));
 			if (!Number.isNaN(parsedPrice)) {
-				const selectedCurrency = context.selected_currency?.value;
-				const companyCurrency = pos_profile.value?.currency;
-				const conversionRate =
-					Number(context.conversion_rate?.value || 1) || 1;
-				const basePrice =
-					selectedCurrency &&
-					companyCurrency &&
-					selectedCurrency !== companyCurrency
-						? parsedPrice * conversionRate
-						: parsedPrice;
+				const basePrice = toCompanyCurrency(
+					{
+						pos_profile: pos_profile.value,
+						currency: context.selected_currency?.value,
+						selected_currency: context.selected_currency?.value,
+						conversion_rate: context.conversion_rate?.value,
+					},
+					parsedPrice,
+				);
 
 				newItem.rate = parsedPrice;
 				newItem.price_list_rate = parsedPrice;
@@ -338,17 +332,17 @@ export function useScanProcessor(context: ScanProcessorContext) {
 					? newItem.actual_qty
 					: null;
 
-		if (
-			!isReturnMode() &&
-			!shouldDeferStockValidation() &&
-			availableQty !== null &&
-			availableQty < requestedQty
-		) {
-			const negativeStockEnabled = isNegativeStockEnabled(newItem);
-			const exceedsAvailable = availableQty < requestedQty;
-			const shouldBlock =
-				(blockSaleBeyondAvailableQty.value && exceedsAvailable) ||
-				(!negativeStockEnabled && exceedsAvailable);
+		if (availableQty !== null) {
+			const shouldBlock = shouldBlockSaleForStock({
+				item: newItem,
+				requestedQty,
+				availableQty,
+				posProfile: pos_profile.value,
+				stockSettings: context.stock_settings.value,
+				blockSaleBeyondAvailableQty: blockSaleBeyondAvailableQty.value,
+				isReturnInvoice: isReturnMode(),
+				deferStockValidationToPayment: shouldDeferStockValidation(),
+			});
 
 			if (shouldBlock) {
 				showScanError({
@@ -364,8 +358,6 @@ export function useScanProcessor(context: ScanProcessorContext) {
 				});
 				return;
 			}
-
-			// Suppress low stock notifications when negative stock is allowed
 		}
 
 		awaitingScanResult.value = true;
@@ -592,12 +584,15 @@ export function useScanProcessor(context: ScanProcessorContext) {
 					if (resolved?.item_code) {
 						searchCode = String(resolved.item_code);
 						if (resolved?.serial_no) {
-							scanAssignment.serialNo = String(resolved.serial_no);
+							scanAssignment.serialNo = String(
+								resolved.serial_no,
+							);
 						}
 						if (resolved?.batch_no) {
 							scanAssignment.batchNo = String(resolved.batch_no);
 						}
-						foundItem = barcodeIndex.lookupItemByBarcode(searchCode);
+						foundItem =
+							barcodeIndex.lookupItemByBarcode(searchCode);
 					}
 				} catch (error) {
 					console.error(
@@ -689,7 +684,8 @@ export function useScanProcessor(context: ScanProcessorContext) {
 					scannedCode,
 				);
 				scanAssignment = {
-					serialNo: scanAssignment.serialNo || localAssignment.serialNo,
+					serialNo:
+						scanAssignment.serialNo || localAssignment.serialNo,
 					batchNo: scanAssignment.batchNo || localAssignment.batchNo,
 				};
 				await addScannedItemToInvoice(

@@ -76,6 +76,26 @@ describe("useItemAddition new line behavior", () => {
 		expect(context.items[0].qty).toBe(2);
 	});
 
+	it("uses the selector quantity even when the catalog row carries a stale qty", async () => {
+		const api = useItemAddition();
+		const context = createContext(false);
+		const item = { ...createItem(), qty: "1" } as any;
+
+		await api.prepareItemForCart(item, 5, context);
+
+		expect(item.qty).toBe(5);
+	});
+
+	it("preserves an embedded barcode quantity instead of the selector quantity", async () => {
+		const api = useItemAddition();
+		const context = createContext(false);
+		const item = { ...createItem(), qty: 2.5, _barcode_qty: true } as any;
+
+		await api.prepareItemForCart(item, 5, context);
+
+		expect(item.qty).toBe(2.5);
+	});
+
 	it("refreshes line amount when a repeated click merges quantity", async () => {
 		const api = useItemAddition();
 		const context = createContext(false);
@@ -139,6 +159,37 @@ describe("useItemAddition new line behavior", () => {
 		expect(invoiceStore.grossTotal).toBe(20);
 	});
 
+	it("falls back to numeric rates when incoming base rates are null", async () => {
+		const api = useItemAddition();
+		const context = {
+			...createContext(false),
+			selected_currency: "USD",
+			conversion_rate: 280,
+			currency_precision: 2,
+			flt: (value: any) => Number(value),
+		};
+		context.pos_profile.currency = "PKR";
+
+		const item = {
+			...createItem(),
+			rate: 0.04,
+			price_list_rate: 0.04,
+			base_rate: null,
+			base_price_list_rate: null,
+		};
+
+		await api.prepareItemForCart(item, 1, context);
+		await api.addItem(item, context);
+
+		expect(context.items).toHaveLength(1);
+		expect(context.items[0].base_rate).toBeCloseTo(11.2);
+		expect(context.items[0].base_price_list_rate).toBeCloseTo(11.2);
+		expect(context.items[0].original_base_rate).toBeCloseTo(11.2);
+		expect(context.items[0].original_base_price_list_rate).toBeCloseTo(
+			11.2,
+		);
+	});
+
 	it("resolves batched merge when invoice store lacks updateItemWithTotals", async () => {
 		const api = useItemAddition();
 		const context = createContext(false) as any;
@@ -187,11 +238,47 @@ describe("useItemAddition new line behavior", () => {
 		expect(invoiceStore.recalculateTotals).toHaveBeenCalled();
 	});
 
+	it("merges an unresolved batch click into the existing batched row", async () => {
+		const api = useItemAddition();
+		const context = createContext(false) as any;
+		context.items.push({
+			...createItem(),
+			posa_row_id: "batch-row",
+			has_batch_no: 1,
+			batch_no: "B-FEFO",
+			qty: 1,
+		});
+
+		const incoming = {
+			...createItem(),
+			has_batch_no: 1,
+			batch_no: null,
+			batch_no_data: [],
+		};
+		await api.prepareItemForCart(incoming, 1, context);
+		await api.addItem(incoming, context);
+
+		expect(context.items).toHaveLength(1);
+		expect(context.items[0].qty).toBe(2);
+	});
+
 	it("keeps grouped merge quantities numeric when incoming qty is a string", () => {
 		const { groupAndAddItem } = useItemMerging() as any;
-		const items = [{ item_code: "ITEM-001", uom: "Nos", rate: 10, qty: "1", amount: 10 }];
+		const items = [
+			{
+				item_code: "ITEM-001",
+				uom: "Nos",
+				rate: 10,
+				qty: "1",
+				amount: 10,
+			},
+		];
 
-		groupAndAddItem(items, { item_code: "ITEM-001", uom: "Nos", rate: 10, qty: "2" }, {});
+		groupAndAddItem(
+			items,
+			{ item_code: "ITEM-001", uom: "Nos", rate: 10, qty: "2" },
+			{},
+		);
 
 		expect(items[0].qty).toBe(3);
 		expect(typeof items[0].qty).toBe("number");
@@ -213,6 +300,38 @@ describe("useItemAddition new line behavior", () => {
 		expect(context.items).toHaveLength(2);
 		expect(context.items[0].qty).toBe(1);
 		expect(context.items[1].qty).toBe(1);
+	});
+
+	it("appends distinct Counter Grid items in entry order", async () => {
+		const api = useItemAddition();
+		const invoiceStore = useInvoiceStore();
+		const context = {
+			...createContext(false),
+			invoiceStore,
+			appendNewItems: true,
+			currency_precision: 2,
+			flt: (value: any) => Number(value),
+		} as any;
+		Object.defineProperty(context, "items", {
+			get: () => invoiceStore.items,
+		});
+
+		const first = createItem();
+		await api.prepareItemForCart(first, 1, context);
+		await api.addItem(first, context);
+
+		const second = {
+			...createItem(),
+			item_code: "ITEM-002",
+			item_name: "Second Item",
+		};
+		await api.prepareItemForCart(second, 1, context);
+		await api.addItem(second, context);
+
+		expect(invoiceStore.items.map((item) => item.item_code)).toEqual([
+			"ITEM-001",
+			"ITEM-002",
+		]);
 	});
 
 	it("auto-selects the FEFO batch and applies its batch price on add", async () => {
@@ -259,6 +378,113 @@ describe("useItemAddition new line behavior", () => {
 		expect(context.items[0].price_list_rate).toBe(7);
 	});
 
+	it("splits one requested quantity across multiple batch rows", async () => {
+		const api = useItemAddition();
+		const context = createContext(false) as any;
+		const batchSerial = useBatchSerial();
+		context.pos_profile.posa_auto_set_batch = 1;
+		context.price_list_currency = "USD";
+		context.selected_currency = "USD";
+		context.exchange_rate = 1;
+		context.currency_precision = 2;
+		context.flt = Number;
+		context.forceUpdate = vi.fn();
+		context.setBatchQty = (line: any, value: any, update?: boolean) =>
+			batchSerial.setBatchQty(line, value, update, context);
+
+		const item = {
+			...createItem(),
+			qty: 5,
+			has_batch_no: 1,
+			batch_no_data: [
+				{ batch_no: "B-1", batch_qty: 2, is_expired: false },
+				{ batch_no: "B-2", batch_qty: 3, is_expired: false },
+			],
+		};
+
+		await api.prepareItemForCart(item, 5, context);
+		await api.addItem(item, context);
+
+		expect(context.items).toHaveLength(2);
+		expect(
+			context.items
+				.map((line: any) => [line.batch_no, line.qty])
+				.sort(([left]: any, [right]: any) => left.localeCompare(right)),
+		).toEqual([
+			["B-1", 2],
+			["B-2", 3],
+		]);
+	});
+
+	it("allocates batches in stock units for an alternate UOM", async () => {
+		const api = useItemAddition();
+		const context = createContext(false) as any;
+		const batchSerial = useBatchSerial();
+		context.pos_profile.posa_auto_set_batch = 1;
+		context.price_list_currency = "USD";
+		context.selected_currency = "USD";
+		context.exchange_rate = 1;
+		context.currency_precision = 2;
+		context.flt = Number;
+		context.forceUpdate = vi.fn();
+		context.setBatchQty = (line: any, value: any, update?: boolean) =>
+			batchSerial.setBatchQty(line, value, update, context);
+
+		const item = {
+			...createItem(),
+			qty: 2,
+			conversion_factor: 6,
+			item_uoms: [{ uom: "Box", conversion_factor: 6 }],
+			uom: "Box",
+			has_batch_no: 1,
+			batch_no_data: [
+				{ batch_no: "B-1", batch_qty: 5, is_expired: false },
+				{ batch_no: "B-2", batch_qty: 7, is_expired: false },
+			],
+		};
+
+		await api.prepareItemForCart(item, 2, context);
+		await api.addItem(item, context);
+
+		expect(context.items).toHaveLength(2);
+		const byBatch = new Map(
+			context.items.map((line: any) => [line.batch_no, line]),
+		);
+		expect(byBatch.get("B-1").qty).toBeCloseTo(5 / 6);
+		expect(byBatch.get("B-2").qty).toBeCloseTo(7 / 6);
+		expect(
+			context.items.reduce(
+				(total: number, line: any) => total + line.qty,
+				0,
+			),
+		).toBeCloseTo(2);
+	});
+
+	it("auto-assigns serials using converted stock quantity", async () => {
+		const api = useItemAddition();
+		const context = createContext(false) as any;
+		const item = {
+			...createItem(),
+			has_serial_no: 1,
+			qty: 1,
+			conversion_factor: 2,
+			item_uoms: [{ uom: "Nos", conversion_factor: 2 }],
+			serial_no_data: [
+				{ serial_no: "SER-001" },
+				{ serial_no: "SER-002" },
+			],
+		};
+
+		await api.prepareItemForCart(item, 1, context);
+		await api.addItem(item, context);
+
+		expect(context.items[0].serial_no_selected).toEqual([
+			"SER-001",
+			"SER-002",
+		]);
+		expect(context.items[0].qty).toBe(1);
+	});
+
 	it("resets return invoice type back to Invoice on clear", () => {
 		const api = useItemAddition();
 		const emit = vi.fn();
@@ -291,6 +517,7 @@ describe("useItemAddition new line behavior", () => {
 				emit,
 			},
 			update_price_list: vi.fn(),
+			reset_currency_to_default: vi.fn(),
 		} as any;
 
 		api.clearInvoice(context);
@@ -299,6 +526,7 @@ describe("useItemAddition new line behavior", () => {
 		expect(context.invoiceTypes).toEqual(["Invoice", "Order", "Quotation"]);
 		expect(context.customer).toBe("Walk in Customer");
 		expect(context.return_doc).toBe("");
+		expect(context.reset_currency_to_default).not.toHaveBeenCalled();
 		expect(emit).toHaveBeenCalledWith("set_customer_readonly", false);
 	});
 });

@@ -51,6 +51,13 @@
 						v-model="pinForm.current_pin"
 						class="navbar-cashier-pin-form__input"
 						:type="pinVisibility.current_pin ? 'text' : 'password'"
+						name="pos-current-cashier-pin"
+						autocomplete="one-time-code"
+						inputmode="numeric"
+						pattern="[0-9]*"
+						data-1p-ignore="true"
+						data-lpignore="true"
+						data-bwignore="true"
 						:disabled="pinStatusLoading || pinSubmitting"
 					/>
 					<button
@@ -73,6 +80,13 @@
 						v-model="pinForm.new_pin"
 						class="navbar-cashier-pin-form__input"
 						:type="pinVisibility.new_pin ? 'text' : 'password'"
+						name="pos-new-cashier-pin"
+						autocomplete="one-time-code"
+						inputmode="numeric"
+						pattern="[0-9]*"
+						data-1p-ignore="true"
+						data-lpignore="true"
+						data-bwignore="true"
 						:disabled="pinStatusLoading || pinSubmitting"
 					/>
 					<button
@@ -95,6 +109,13 @@
 						v-model="pinForm.confirm_pin"
 						class="navbar-cashier-pin-form__input"
 						:type="pinVisibility.confirm_pin ? 'text' : 'password'"
+						name="pos-confirm-cashier-pin"
+						autocomplete="one-time-code"
+						inputmode="numeric"
+						pattern="[0-9]*"
+						data-1p-ignore="true"
+						data-lpignore="true"
+						data-bwignore="true"
 						:disabled="pinStatusLoading || pinSubmitting"
 					/>
 					<button

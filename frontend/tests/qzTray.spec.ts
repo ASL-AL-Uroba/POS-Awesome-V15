@@ -137,6 +137,24 @@ describe("qzTray service", () => {
 		expect(qzTray.selectedQzPrinter.value).toBe("Profile Printer");
 	});
 
+	it("prefers the POS Profile default over a transient selected printer", async () => {
+		qzMock.posProfile.value = {
+			posa_qz_printer_name: "Profile Printer",
+		};
+		qzMock.setActive(true);
+
+		const qzTray = await import("../src/posapp/services/qzTray");
+
+		qzTray.selectedQzPrinter.value = "Printer A";
+
+		await qzTray.printHtmlViaQz("<p>Receipt</p>");
+
+		expect(qzMock.createConfig).toHaveBeenCalledWith(
+			"Profile Printer",
+			expect.any(Object),
+		);
+	});
+
 	it("falls back to the first discovered printer when no override or profile default exists", async () => {
 		qzMock.setActive(true);
 		qzMock.findPrinters.mockResolvedValue(["Printer A", "Printer B"]);
@@ -146,5 +164,26 @@ describe("qzTray service", () => {
 		await qzTray.findQzPrinters();
 
 		expect(qzTray.selectedQzPrinter.value).toBe("Printer A");
+	});
+
+	it("sends raw printer commands using QZ command format", async () => {
+		qzMock.setActive(true);
+		qzMock.findPrinters.mockResolvedValue(["Receipt Printer"]);
+
+		const qzTray = await import("../src/posapp/services/qzTray");
+
+		await qzTray.sendRawToQz("\x1B@Hello\n");
+
+		expect(qzMock.print).toHaveBeenCalledWith(
+			expect.objectContaining({ printer: "Receipt Printer" }),
+			[
+				{
+					type: "raw",
+					format: "command",
+					flavor: "plain",
+					data: "\x1B@Hello\n",
+				},
+			],
+		);
 	});
 });

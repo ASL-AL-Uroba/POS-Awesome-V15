@@ -30,12 +30,16 @@ import { useToastStore } from "../../../stores/toastStore";
 import { useUIStore } from "../../../stores/uiStore";
 import {
 	getCachedCurrencyOptions,
-	getCachedExchangeRate,
 	getCachedPriceListMeta,
 	saveCurrencyOptionsCache,
-	saveExchangeRateCache,
 	savePriceListMetaCache,
 } from "../../../../offline/index";
+import { resolveExchangeRate } from "../../../services/exchangeRateResolver";
+import {
+	fromCompanyCurrency,
+	getPlcConversionRate,
+	toCompanyCurrency,
+} from "../../../utils/erpnextCurrency";
 
 // @ts-ignore
 const __ = window.__ || ((s) => s);
@@ -91,9 +95,89 @@ export function useInvoiceCurrency() {
 		return Number((_value || 0).toFixed(prec));
 	};
 
+	const parseFinite = (value: unknown): number | null => {
+		const numeric = Number.parseFloat(String(value ?? ""));
+		return Number.isFinite(numeric) ? numeric : null;
+	};
+
+	const resolveOriginalBasePriceListRate = (
+		item: any,
+		currencyContext: Record<string, any>,
+	): number | null => {
+		const conversionFactor = parseFinite(item?.conversion_factor) || 1;
+		const originalBasePriceListRate = parseFinite(
+			item?.original_base_price_list_rate,
+		);
+		if (originalBasePriceListRate !== null) {
+			return originalBasePriceListRate * conversionFactor;
+		}
+
+		const originalRate = parseFinite(item?.original_rate);
+		if (originalRate !== null) {
+			return originalRate * getPlcConversionRate(currencyContext);
+		}
+
+		return null;
+	};
+
+	const refreshCanonicalBaseRates = (
+		item: any,
+		currencyContext: Record<string, any>,
+	) => {
+		if (!item || item._manual_rate_set === true || item.locked_price) {
+			return;
+		}
+
+		const canonicalBasePriceListRate =
+			resolveOriginalBasePriceListRate(item, currencyContext);
+		if (canonicalBasePriceListRate === null) {
+			return;
+		}
+
+		const baseDiscountAmount =
+			parseFinite(item.base_discount_amount) ?? 0;
+		item.base_price_list_rate = canonicalBasePriceListRate;
+
+		if (baseDiscountAmount > 0) {
+			item.base_rate = Math.max(
+				canonicalBasePriceListRate - baseDiscountAmount,
+				0,
+			);
+		} else if (!item.posa_offer_applied) {
+			item.base_rate = canonicalBasePriceListRate;
+		}
+	};
+
 	const fetch_available_currencies = async () => {
 		if (!pos_profile.value) return [];
 		const profileName = pos_profile.value.name;
+		const configured = Array.isArray(pos_profile.value.posa_allowed_currencies)
+			? pos_profile.value.posa_allowed_currencies
+					.filter(
+						(row: any) =>
+							row?.allow_for_invoices === undefined ||
+							row.allow_for_invoices === 1 ||
+							row.allow_for_invoices === "1" ||
+							row.allow_for_invoices === true,
+					)
+					.map((row: any) => row?.currency)
+					.filter(Boolean)
+			: [];
+		if (configured.length) {
+			available_currencies.value = [...new Set(configured)].map((currency) => ({
+				value: currency,
+				title: currency,
+			}));
+			const baseCurrency = pos_profile.value.currency;
+			available_currencies.value.sort((a, b) => {
+				if (a.value === baseCurrency) return -1;
+				if (b.value === baseCurrency) return 1;
+				return a.value.localeCompare(b.value);
+			});
+			selected_currency.value ||= baseCurrency;
+			saveCurrencyOptionsCache(profileName, available_currencies.value);
+			return available_currencies.value;
+		}
 		try {
 			const r = await frappe.call({
 				method: "posawesome.posawesome.api.invoices.get_available_currencies",
@@ -150,93 +234,42 @@ export function useInvoiceCurrency() {
 			pos_profile.value.currency;
 		const plCurrency = price_list_currency.value || companyCurrency;
 
-		try {
-			// Price list currency to selected currency rate
-			if (selected_currency.value === plCurrency) {
-				exchange_rate.value = 1;
-			} else {
-				const r = await frappe.call({
-					method: "posawesome.posawesome.api.invoices.fetch_exchange_rate_pair",
-					args: {
-						from_currency: plCurrency,
-						to_currency: selected_currency.value,
-					},
-				});
-				if (r && r.message) {
-					exchange_rate.value = r.message.exchange_rate;
-					saveExchangeRateCache({
-						profileName: pos_profile.value.name,
-						company: pos_profile.value.company,
-						fromCurrency: plCurrency,
-						toCurrency: selected_currency.value,
-						date: r.message.date || rateDate,
-						exchange_rate: r.message.exchange_rate,
-					});
-				}
-			}
+		const common = {
+			profileName: pos_profile.value.name,
+			company: pos_profile.value.company,
+			effectiveDate: rateDate,
+		};
+		const companyResult = await resolveExchangeRate({
+			...common,
+			fromCurrency: selected_currency.value,
+			toCurrency: companyCurrency,
+		});
+		const displayResult = await resolveExchangeRate({
+			...common,
+			fromCurrency: plCurrency,
+			toCurrency: selected_currency.value,
+		});
 
-			// Selected currency to company currency rate
-			if (selected_currency.value === companyCurrency) {
-				conversion_rate.value = 1;
-				exchange_rate_date.value = frappe.datetime.get_today();
-			} else {
-				const r2 = await frappe.call({
-					method: "posawesome.posawesome.api.invoices.fetch_exchange_rate_pair",
-					args: {
-						from_currency: selected_currency.value,
-						to_currency: companyCurrency,
-					},
-				});
-				if (r2 && r2.message) {
-					conversion_rate.value = r2.message.exchange_rate;
-					exchange_rate_date.value = r2.message.date;
-					saveExchangeRateCache({
-						profileName: pos_profile.value.name,
-						company: pos_profile.value.company,
-						fromCurrency: selected_currency.value,
-						toCurrency: companyCurrency,
-						date: r2.message.date || rateDate,
-						exchange_rate: r2.message.exchange_rate,
-					});
-				}
-			}
-		} catch (error) {
-			console.error("Error updating currency:", error);
-			const cachedDisplayRate = getCachedExchangeRate({
-				profileName: pos_profile.value.name,
-				company: pos_profile.value.company,
-				fromCurrency: plCurrency,
-				toCurrency: selected_currency.value,
-				date: rateDate,
+		conversion_rate.value = companyResult.rate || 0;
+		exchange_rate.value = displayResult.rate || 0;
+		exchange_rate_date.value =
+			companyResult.rateDate || displayResult.rateDate || rateDate;
+
+		if (!companyResult.found || !displayResult.found) {
+			toastStore.show({
+				title: __("No valid exchange rate found"),
+				color: "error",
 			});
-			const cachedConversionRate = getCachedExchangeRate({
-				profileName: pos_profile.value.name,
-				company: pos_profile.value.company,
-				fromCurrency: selected_currency.value,
-				toCurrency: companyCurrency,
-				date: rateDate,
-			});
-			if (cachedDisplayRate?.exchange_rate) {
-				exchange_rate.value = cachedDisplayRate.exchange_rate;
-			}
-			if (selected_currency.value === companyCurrency) {
-				conversion_rate.value = 1;
-			} else if (cachedConversionRate?.exchange_rate) {
-				conversion_rate.value = cachedConversionRate.exchange_rate;
-			}
-			if (
-				!cachedDisplayRate?.exchange_rate &&
-				!(
-					selected_currency.value === companyCurrency ||
-					cachedConversionRate?.exchange_rate
-				)
-			) {
-				toastStore.show({
-					title: __("Error updating currency"),
-					color: "error",
-				});
-			}
 		}
+	};
+
+	const reset_currency_to_default = async () => {
+		const defaultCurrency =
+			pos_profile.value?.currency || company.value?.default_currency || "";
+		if (!defaultCurrency) return;
+
+		selected_currency.value = defaultCurrency;
+		await update_currency_and_rate();
 	};
 
 	const update_item_rates = async () => {
@@ -250,9 +283,18 @@ export function useInvoiceCurrency() {
 			pos_profile.value?.currency;
 		const conversionRate = conversion_rate.value || 1;
 		const precision = currency_precision.value;
+		const currencyContext = {
+			pos_profile: pos_profile.value,
+			company: company.value,
+			price_list_currency: price_list_currency.value || companyCurrency,
+			selected_currency: selected_currency.value,
+			exchange_rate: exchange_rate.value || 1,
+			conversion_rate: conversionRate,
+		};
 
 		items.forEach((item: any) => {
 			item._skip_calc = true;
+			refreshCanonicalBaseRates(item, currencyContext);
 
 			// Ensure base rates exist
 			if (!item.base_rate) {
@@ -261,11 +303,20 @@ export function useInvoiceCurrency() {
 					item.base_price_list_rate = item.price_list_rate;
 					item.base_discount_amount = item.discount_amount || 0;
 				} else {
-					item.base_rate = item.rate * conversionRate;
+					item.base_rate = toCompanyCurrency(
+						currencyContext,
+						item.rate,
+					);
 					item.base_price_list_rate =
-						item.price_list_rate * conversionRate;
+						toCompanyCurrency(
+							currencyContext,
+							item.price_list_rate,
+						);
 					item.base_discount_amount =
-						(item.discount_amount || 0) * conversionRate;
+						toCompanyCurrency(
+							currencyContext,
+							item.discount_amount || 0,
+						);
 				}
 			}
 
@@ -275,15 +326,24 @@ export function useInvoiceCurrency() {
 				item.discount_amount = item.base_discount_amount;
 			} else {
 				const converted_price = flt(
-					item.base_price_list_rate / conversionRate,
+					fromCompanyCurrency(
+						currencyContext,
+						item.base_price_list_rate,
+					),
 					precision,
 				);
 				const converted_rate = flt(
-					item.base_rate / conversionRate,
+					fromCompanyCurrency(
+						currencyContext,
+						item.base_rate,
+					),
 					precision,
 				);
 				const converted_discount = flt(
-					item.base_discount_amount / conversionRate,
+					fromCompanyCurrency(
+						currencyContext,
+						item.base_discount_amount,
+					),
 					precision,
 				);
 
@@ -297,6 +357,13 @@ export function useInvoiceCurrency() {
 			item.amount = flt(item.qty * item.rate, precision);
 			item.base_amount = flt(item.qty * item.base_rate, precision);
 		});
+
+		if (typeof invoiceStore.recalculateTotals === "function") {
+			invoiceStore.recalculateTotals();
+		}
+		if (typeof invoiceStore.touch === "function") {
+			invoiceStore.touch();
+		}
 	};
 
 	const roundAmount = (amount: number) => {
@@ -377,6 +444,7 @@ export function useInvoiceCurrency() {
 		flt,
 		fetch_available_currencies,
 		update_currency_and_rate,
+		reset_currency_to_default,
 		update_currency: async (val: string) => {
 			if (val) selected_currency.value = val;
 			await update_currency_and_rate();

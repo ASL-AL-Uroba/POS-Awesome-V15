@@ -15,7 +15,9 @@
  * **Durable store — Dexie / IndexedDB (`db`)**
  * IndexedDB is the persistent source of truth for business and cache data. Large datasets
  * that would overflow localStorage live here directly. Currently:
- * - `items` — full item catalogue, stored with derived search fields for Dexie indexing.
+ * - `item_catalog_rows` / `item_catalog_state` — generation-scoped item catalog and
+ *   atomic active pointer. The legacy `items` table remains a read fallback until the
+ *   first complete V17 generation is promoted.
  * - `customers` — all customers.
  * - `pos_profiles` / `opening_shifts` — structural records persisted on shift open.
  *
@@ -58,6 +60,8 @@
 import { refreshBootstrapSnapshotFromCaches } from "./bootstrapSnapshot";
 import { memory, persist, db, checkDbHealth } from "./db";
 import { emitBootstrapSnapshotUpdated } from "../posapp/utils/bootstrapRuntimeEvents";
+import { finishStartupPhase, startStartupPhase } from "../utils/startupTrace";
+import { itemPriceRepository } from "./repositories";
 
 const normalizeScope = (scope: unknown): string => String(scope || "");
 const hasScope = (scope: unknown): boolean => normalizeScope(scope).length > 0;
@@ -88,46 +92,80 @@ type SearchableItem = Record<string, any> & {
 	item_name?: string | null;
 	item_barcode?: string | ItemBarcodeEntry[] | null;
 	barcodes?: unknown[];
+	barcodes_lc?: unknown[];
 	name_keywords?: unknown[];
+	name_keywords_lc?: unknown[];
 	serial_no_data?: ItemSerialEntry[] | null;
 	serials?: unknown[];
 	batch_no_data?: ItemBatchEntry[] | null;
 	batches?: unknown[];
 };
 
-const deriveItemSearchFields = (item: SearchableItem | null | undefined) => {
+const normalizeSearchValue = (value: unknown): string =>
+	String(value || "")
+		.normalize("NFKD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.toLowerCase()
+		.trim();
+
+const uniqueStrings = (values: unknown[]): string[] =>
+	Array.from(
+		new Set(
+			values.map((value) => String(value || "").trim()).filter(Boolean),
+		),
+	);
+
+export const deriveItemSearchFields = (
+	item: SearchableItem | null | undefined,
+) => {
 	const safeItem: SearchableItem = item || {};
 
 	const getBarcodes = (): string[] => {
+		const values: unknown[] = [];
 		if (Array.isArray(safeItem.item_barcode)) {
-			return safeItem.item_barcode
-				.map((barcodeEntry) => barcodeEntry?.barcode)
-				.filter((barcode): barcode is string => Boolean(barcode));
-		}
-		if (safeItem.item_barcode) {
-			return [String(safeItem.item_barcode)];
+			values.push(
+				...safeItem.item_barcode
+					.map((barcodeEntry) => barcodeEntry?.barcode)
+					.filter((barcode): barcode is string => Boolean(barcode)),
+			);
+		} else if (safeItem.item_barcode) {
+			values.push(String(safeItem.item_barcode));
 		}
 		if (Array.isArray(safeItem.barcodes)) {
-			return safeItem.barcodes
-				.map((barcode) => String(barcode))
-				.filter(Boolean);
+			values.push(
+				...safeItem.barcodes
+					.map((entry: any) =>
+						entry && typeof entry === "object"
+							? entry.barcode
+							: entry,
+					)
+					.filter(Boolean),
+			);
 		}
-		return [];
+		return uniqueStrings(values);
 	};
 
 	const getNameKeywords = (): string[] => {
-		if (safeItem.item_name) {
-			return String(safeItem.item_name)
-				.toLowerCase()
-				.split(/\s+/)
-				.filter(Boolean);
-		}
+		const values = [
+			safeItem.item_name,
+			safeItem.retailmind_short_name,
+			safeItem.brand,
+			safeItem.item_group,
+			safeItem.retailmind_old_pos_pack,
+			safeItem.retailmind_old_pos_company_code,
+			safeItem.retailmind_old_pos_generic_code,
+			safeItem.retailmind_old_pos_generic_name,
+			safeItem.retailmind_old_pos_rack,
+		];
 		if (Array.isArray(safeItem.name_keywords)) {
-			return safeItem.name_keywords
-				.map((keyword) => String(keyword))
-				.filter(Boolean);
+			values.push(...safeItem.name_keywords);
 		}
-		return [];
+		return uniqueStrings(
+			values.flatMap((value) => {
+				const normalized = normalizeSearchValue(value);
+				return normalized ? normalized.split(/\s+/) : [];
+			}),
+		);
 	};
 
 	const getSerials = (): string[] => {
@@ -158,13 +196,86 @@ const deriveItemSearchFields = (item: SearchableItem | null | undefined) => {
 		return [];
 	};
 
+	const barcodes = getBarcodes();
+	const nameKeywords = getNameKeywords();
+	const itemCodeLc = normalizeSearchValue(safeItem.item_code);
+	const itemNameLc = normalizeSearchValue(safeItem.item_name);
+	const barcodesLc = barcodes.map(normalizeSearchValue).filter(Boolean);
+	const nameKeywordsLc = nameKeywords
+		.map(normalizeSearchValue)
+		.filter(Boolean);
+
 	return {
 		...safeItem,
-		barcodes: getBarcodes(),
-		name_keywords: getNameKeywords(),
+		item_code_lc: itemCodeLc,
+		item_name_lc: itemNameLc,
+		barcodes,
+		barcodes_lc: barcodesLc,
+		name_keywords: nameKeywords,
+		name_keywords_lc: nameKeywordsLc,
 		serials: getSerials(),
 		batches: getBatches(),
+		search_text: [itemCodeLc, itemNameLc, ...barcodesLc, ...nameKeywordsLc]
+			.filter(Boolean)
+			.join(" "),
 	};
+};
+
+const itemMatchesStoredSearch = (
+	item: Record<string, any>,
+	term: string,
+	terms: string[],
+) => {
+	const itemName = item.item_name_lc || normalizeSearchValue(item.item_name);
+	const itemCode = item.item_code_lc || normalizeSearchValue(item.item_code);
+	const searchText = item.search_text || "";
+	const barcodes = Array.isArray(item.barcodes_lc)
+		? item.barcodes_lc
+		: Array.isArray(item.barcodes)
+			? item.barcodes.map(normalizeSearchValue)
+			: [];
+
+	const nameMatch =
+		itemName && terms.every((token) => itemName.includes(token));
+	const codeMatch = itemCode && itemCode.includes(term);
+	const barcodeMatch = barcodes.some((barcode) => barcode.includes(term));
+	const textMatch =
+		searchText && terms.every((token) => searchText.includes(token));
+
+	return Boolean(nameMatch || codeMatch || barcodeMatch || textMatch);
+};
+
+const scoreStoredItemSearch = (
+	item: Record<string, any>,
+	term: string,
+	terms: string[],
+) => {
+	const itemName = item.item_name_lc || normalizeSearchValue(item.item_name);
+	const itemCode = item.item_code_lc || normalizeSearchValue(item.item_code);
+	const barcodes = Array.isArray(item.barcodes_lc)
+		? item.barcodes_lc
+		: Array.isArray(item.barcodes)
+			? item.barcodes.map(normalizeSearchValue)
+			: [];
+	const nameKeywords = Array.isArray(item.name_keywords_lc)
+		? item.name_keywords_lc
+		: Array.isArray(item.name_keywords)
+			? item.name_keywords.map(normalizeSearchValue)
+			: [];
+
+	if (itemCode === term) return 1000;
+	if (barcodes.includes(term)) return 950;
+	if (itemCode.startsWith(term)) return 800;
+	if (itemName.startsWith(term)) return 700;
+	if (
+		terms.length &&
+		terms.every((token) =>
+			nameKeywords.some((keyword) => keyword.startsWith(token)),
+		)
+	) {
+		return 650;
+	}
+	return 100;
 };
 
 const toCloneSafeValue = <T>(input: T): T | null => {
@@ -194,6 +305,350 @@ const toCloneSafeValue = <T>(input: T): T | null => {
 		return null;
 	}
 };
+
+const ITEM_CATALOG_ROWS_TABLE = "item_catalog_rows";
+const ITEM_CATALOG_STATE_TABLE = "item_catalog_state";
+const ITEM_WRITE_CHUNK_SIZE = 1000;
+const STALE_CATALOG_GENERATION_MS = 2 * 60 * 60 * 1000;
+const itemCatalogRefreshLocks = new Map<string, Promise<void>>();
+
+type ItemCatalogState = {
+	profile_scope: string;
+	active_generation?: string;
+	row_count?: number;
+	updated_at: string;
+	staging_generations?: Array<{
+		generation: string;
+		started_at: string;
+	}>;
+	retired_generations?: string[];
+};
+
+const createCatalogGeneration = () => {
+	if (
+		typeof crypto !== "undefined" &&
+		typeof crypto.randomUUID === "function"
+	) {
+		return crypto.randomUUID();
+	}
+	return `catalog-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+};
+
+const requireCatalogScope = (scope: unknown) => {
+	const normalized = normalizeScope(scope).trim();
+	if (!normalized) {
+		throw new Error("Item catalog generation requires a POS profile scope");
+	}
+	return normalized;
+};
+
+async function getItemCatalogState(
+	scope: string,
+): Promise<(ItemCatalogState & { active_generation: string }) | null> {
+	const state = await db.table(ITEM_CATALOG_STATE_TABLE).get(scope);
+	return state?.active_generation
+		? (state as ItemCatalogState & { active_generation: string })
+		: null;
+}
+
+export async function getActiveItemCatalogGeneration(scope: string) {
+	const normalizedScope = requireCatalogScope(scope);
+	await checkDbHealth();
+	if (!db.isOpen()) await db.open();
+	return (
+		(await getItemCatalogState(normalizedScope))?.active_generation || null
+	);
+}
+
+function activeCatalogCollection(scope: string, generation: string) {
+	return db
+		.table(ITEM_CATALOG_ROWS_TABLE)
+		.where("[profile_scope+catalog_generation]")
+		.equals([scope, generation]);
+}
+
+async function resolveScopedCatalogCollection(scope: string) {
+	const state = await getItemCatalogState(scope);
+	if (state) {
+		return {
+			collection: activeCatalogCollection(scope, state.active_generation),
+			generation: state.active_generation,
+			usesGeneration: true,
+		};
+	}
+	return {
+		collection: filterByScope(db.table("items"), scope),
+		generation: null,
+		usesGeneration: false,
+	};
+}
+
+function normalizeCatalogRows(
+	items: unknown,
+	scope: string,
+	generation: string | null,
+	existingByCode: Map<string, Record<string, any>> = new Map(),
+) {
+	return (Array.isArray(items) ? items : [])
+		.filter((item) => item?.item_code)
+		.map((item) => toCloneSafeValue<Record<string, any>>(item))
+		.filter((item): item is Record<string, any> => !!item?.item_code)
+		.map((item) => {
+			const existing = existingByCode.get(item.item_code) || {};
+			return deriveItemSearchFields({
+				...existing,
+				...item,
+				profile_scope:
+					scope || item.profile_scope || existing.profile_scope || "",
+				...(generation ? { catalog_generation: generation } : {}),
+			});
+		});
+}
+
+async function writeCatalogRows(rows: Record<string, any>[]) {
+	const table = db.table(ITEM_CATALOG_ROWS_TABLE);
+	for (
+		let offset = 0;
+		offset < rows.length;
+		offset += ITEM_WRITE_CHUNK_SIZE
+	) {
+		await table.bulkPut(rows.slice(offset, offset + ITEM_WRITE_CHUNK_SIZE));
+	}
+}
+
+async function deleteCatalogGenerationRows(scope: string, generation: string) {
+	await activeCatalogCollection(scope, generation).delete();
+}
+
+export async function withItemCatalogRefreshLock<T>(
+	scope: string,
+	task: () => Promise<T>,
+): Promise<T> {
+	const normalizedScope = requireCatalogScope(scope);
+	const previous =
+		itemCatalogRefreshLocks.get(normalizedScope) || Promise.resolve();
+	let release!: () => void;
+	const gate = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const tail = previous.catch(() => undefined).then(() => gate);
+	itemCatalogRefreshLocks.set(normalizedScope, tail);
+	await previous.catch(() => undefined);
+	try {
+		return await task();
+	} finally {
+		release();
+		if (itemCatalogRefreshLocks.get(normalizedScope) === tail) {
+			itemCatalogRefreshLocks.delete(normalizedScope);
+		}
+	}
+}
+
+export async function beginItemCatalogGeneration(scope: string) {
+	const normalizedScope = requireCatalogScope(scope);
+	await checkDbHealth();
+	if (!db.isOpen()) await db.open();
+	const generation = createCatalogGeneration();
+	const now = new Date();
+	const rowsTable = db.table(ITEM_CATALOG_ROWS_TABLE);
+	const stateTable = db.table(ITEM_CATALOG_STATE_TABLE);
+	await db.transaction("rw", rowsTable, stateTable, async () => {
+		const current = (await stateTable.get(normalizedScope)) as
+			| ItemCatalogState
+			| undefined;
+		const retainedStaging: NonNullable<
+			ItemCatalogState["staging_generations"]
+		> = [];
+		for (const retiredGeneration of current?.retired_generations || []) {
+			await deleteCatalogGenerationRows(
+				normalizedScope,
+				retiredGeneration,
+			);
+		}
+		for (const staging of current?.staging_generations || []) {
+			const startedAt = Date.parse(staging.started_at);
+			if (
+				Number.isFinite(startedAt) &&
+				now.getTime() - startedAt < STALE_CATALOG_GENERATION_MS
+			) {
+				retainedStaging.push(staging);
+				continue;
+			}
+			await deleteCatalogGenerationRows(
+				normalizedScope,
+				staging.generation,
+			);
+		}
+		retainedStaging.push({
+			generation,
+			started_at: now.toISOString(),
+		});
+		await stateTable.put({
+			...(current || {}),
+			profile_scope: normalizedScope,
+			updated_at: now.toISOString(),
+			staging_generations: retainedStaging,
+			retired_generations: [],
+		});
+	});
+	return {
+		scope: normalizedScope,
+		generation,
+	};
+}
+
+export async function stageItemCatalogRows(
+	items: Record<string, any>[],
+	scope: string,
+	generation: string,
+) {
+	const transformPhase = startStartupPhase("items.transform_and_index", {
+		recordCount: items.length,
+		scope,
+	});
+	const normalizedScope = requireCatalogScope(scope);
+	if (!generation) {
+		throw new Error("Item catalog staging requires a generation id");
+	}
+	await checkDbHealth();
+	if (!db.isOpen()) await db.open();
+	const rows = normalizeCatalogRows(items, normalizedScope, generation);
+	finishStartupPhase(transformPhase, "ok", { recordCount: rows.length });
+	const writePhase = startStartupPhase("items.indexeddb_write", {
+		recordCount: rows.length,
+		table: ITEM_CATALOG_ROWS_TABLE,
+		scope: normalizedScope,
+	});
+	await writeCatalogRows(rows);
+	finishStartupPhase(writePhase, "ok", { recordCount: rows.length });
+	return rows.length;
+}
+
+export async function discardItemCatalogGeneration(
+	scope: string,
+	generation: string,
+) {
+	const normalizedScope = requireCatalogScope(scope);
+	if (!generation) return;
+	await checkDbHealth();
+	if (!db.isOpen()) await db.open();
+	const rowsTable = db.table(ITEM_CATALOG_ROWS_TABLE);
+	const stateTable = db.table(ITEM_CATALOG_STATE_TABLE);
+	await db.transaction("rw", rowsTable, stateTable, async () => {
+		await deleteCatalogGenerationRows(normalizedScope, generation);
+		const current = (await stateTable.get(normalizedScope)) as
+			| ItemCatalogState
+			| undefined;
+		if (!current) return;
+		const stagingGenerations = (current.staging_generations || []).filter(
+			(staging) => staging.generation !== generation,
+		);
+		if (!current.active_generation && !stagingGenerations.length) {
+			await stateTable.delete(normalizedScope);
+			return;
+		}
+		await stateTable.put({
+			...current,
+			updated_at: new Date().toISOString(),
+			staging_generations: stagingGenerations,
+		});
+	});
+}
+
+export async function promoteItemCatalogGeneration(
+	scope: string,
+	generation: string,
+	options: { expectedCount?: number; allowEmpty?: boolean } = {},
+) {
+	const normalizedScope = requireCatalogScope(scope);
+	if (!generation) {
+		throw new Error("Item catalog promotion requires a generation id");
+	}
+	await checkDbHealth();
+	if (!db.isOpen()) await db.open();
+	const rowsTable = db.table(ITEM_CATALOG_ROWS_TABLE);
+	const stateTable = db.table(ITEM_CATALOG_STATE_TABLE);
+	let previousGeneration = "";
+	let retiredGenerations: string[] = [];
+	let rowCount = 0;
+
+	await db.transaction("rw", rowsTable, stateTable, async () => {
+		rowCount = await activeCatalogCollection(
+			normalizedScope,
+			generation,
+		).count();
+		const expectedCount = Number(options.expectedCount);
+		if (
+			Number.isFinite(expectedCount) &&
+			expectedCount >= 0 &&
+			rowCount !== expectedCount
+		) {
+			throw new Error(
+				`Item catalog generation is incomplete: expected ${expectedCount}, stored ${rowCount}`,
+			);
+		}
+		if (!rowCount && !options.allowEmpty) {
+			throw new Error(
+				"Refusing to promote an empty item catalog generation",
+			);
+		}
+
+		const previous = (await stateTable.get(normalizedScope)) as
+			| ItemCatalogState
+			| undefined;
+		previousGeneration = previous?.active_generation || "";
+		retiredGenerations = Array.from(
+			new Set([
+				...(previous?.retired_generations || []),
+				...(previousGeneration && previousGeneration !== generation
+					? [previousGeneration]
+					: []),
+			]),
+		);
+		await stateTable.put({
+			...(previous || {}),
+			profile_scope: normalizedScope,
+			active_generation: generation,
+			row_count: rowCount,
+			updated_at: new Date().toISOString(),
+			staging_generations: (previous?.staging_generations || []).filter(
+				(staging) => staging.generation !== generation,
+			),
+			retired_generations: retiredGenerations,
+		});
+	});
+
+	try {
+		for (const retiredGeneration of retiredGenerations) {
+			await deleteCatalogGenerationRows(
+				normalizedScope,
+				retiredGeneration,
+			);
+		}
+		await filterByScope(db.table("items"), normalizedScope).delete();
+		await db.transaction("rw", stateTable, async () => {
+			const latest = (await stateTable.get(normalizedScope)) as
+				| ItemCatalogState
+				| undefined;
+			if (!latest) return;
+			await stateTable.put({
+				...latest,
+				retired_generations: (latest.retired_generations || []).filter(
+					(retiredGeneration) =>
+						!retiredGenerations.includes(retiredGeneration),
+				),
+				updated_at: new Date().toISOString(),
+			});
+		});
+	} catch (cleanupError) {
+		console.warn(
+			"Failed to prune superseded item catalog rows",
+			cleanupError,
+		);
+	}
+
+	return { generation, rowCount, previousGeneration };
+}
 
 const DEFAULT_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -272,34 +727,39 @@ export async function searchStoredItems({
 		if (!db.isOpen()) await db.open();
 		const normalizedGroup =
 			typeof itemGroup === "string" ? itemGroup.trim() : "";
-		let collection = db.table("items");
+		const normalizedScope = normalizeScope(scope).trim();
+		let collection = normalizedScope
+			? (await resolveScopedCatalogCollection(normalizedScope)).collection
+			: db.table("items").toCollection();
 		if (normalizedGroup && normalizedGroup.toLowerCase() !== "all") {
-			collection = collection
-				.where("item_group")
-				.equalsIgnoreCase(normalizedGroup);
+			const groupLower = normalizedGroup.toLowerCase();
+			collection = collection.filter(
+				(item: any) =>
+					String(item?.item_group || "").toLowerCase() === groupLower,
+			);
 		}
-		collection = filterByScope(collection, scope);
 		const normalizedSearch =
 			typeof search === "string" ? search.trim() : "";
 		if (normalizedSearch) {
-			const term = normalizedSearch.toLowerCase();
+			const term = normalizeSearchValue(normalizedSearch);
 			const terms = term.split(/\s+/).filter(Boolean);
 
-			collection = collection.filter((it) => {
-				const nameMatch =
-					it.item_name &&
-					terms.every((t) => it.item_name.toLowerCase().includes(t));
-				const codeMatch =
-					it.item_code && it.item_code.toLowerCase().includes(term);
-				const barcodeMatch = Array.isArray(it.item_barcode)
-					? it.item_barcode.some(
-							(b) =>
-								b.barcode && b.barcode.toLowerCase() === term,
-						)
-					: it.item_barcode &&
-						String(it.item_barcode).toLowerCase().includes(term);
-				return nameMatch || codeMatch || barcodeMatch;
-			});
+			const matchedItems = await collection
+				.filter((it) => itemMatchesStoredSearch(it, term, terms))
+				.toArray();
+			return matchedItems
+				.map((item, originalIndex) => ({
+					item,
+					originalIndex,
+					score: scoreStoredItemSearch(item, term, terms),
+				}))
+				.sort(
+					(left, right) =>
+						right.score - left.score ||
+						left.originalIndex - right.originalIndex,
+				)
+				.slice(offset, offset + limit)
+				.map(({ item }) => item);
 		}
 
 		const res = await collection.offset(offset).limit(limit).toArray();
@@ -325,10 +785,13 @@ export async function getStoredItemsCountByScope(scope = "") {
 	try {
 		await checkDbHealth();
 		if (!db.isOpen()) await db.open();
-		if (!hasScope(scope)) {
+		const normalizedScope = normalizeScope(scope).trim();
+		if (!normalizedScope) {
 			return await db.table("items").count();
 		}
-		return await filterByScope(db.table("items"), scope).count();
+		return await (
+			await resolveScopedCatalogCollection(normalizedScope)
+		).collection.count();
 	} catch (e) {
 		console.error("Failed to count scoped stored items", e);
 		return 0;
@@ -345,7 +808,9 @@ export async function getAllStoredItems(scope = "") {
 	try {
 		await checkDbHealth();
 		if (!db.isOpen()) await db.open();
-		return await filterByScope(db.table("items"), scope).toArray();
+		return await (
+			await resolveScopedCatalogCollection(normalizeScope(scope).trim())
+		).collection.toArray();
 	} catch (e) {
 		console.error("Failed to read scoped stored items", e);
 		return [];
@@ -360,7 +825,7 @@ export async function saveItems(items, scope = "") {
 	try {
 		await checkDbHealth();
 		if (!db.isOpen()) await db.open();
-		const CHUNK_SIZE = 1000;
+		const normalizedScope = normalizeScope(scope).trim();
 		const incomingItems = Array.isArray(items)
 			? items
 					.filter((it) => it?.item_code)
@@ -371,14 +836,33 @@ export async function saveItems(items, scope = "") {
 			return;
 		}
 
-		const itemCodes = Array.from(new Set(incomingItems.map((it) => it.item_code).filter(Boolean)));
+		const itemCodes = Array.from(
+			new Set(incomingItems.map((it) => it.item_code).filter(Boolean)),
+		);
+		const catalogState = normalizedScope
+			? await getItemCatalogState(normalizedScope)
+			: null;
+		const targetTable = catalogState
+			? db.table(ITEM_CATALOG_ROWS_TABLE)
+			: db.table("items");
 		const existingRows: any[] = [];
-		for (let i = 0; i < itemCodes.length; i += CHUNK_SIZE) {
-			const codeChunk = itemCodes.slice(i, i + CHUNK_SIZE);
+		for (let i = 0; i < itemCodes.length; i += ITEM_WRITE_CHUNK_SIZE) {
+			const codeChunk = itemCodes.slice(i, i + ITEM_WRITE_CHUNK_SIZE);
 			if (!codeChunk.length) {
 				continue;
 			}
-			const rows = await db.table("items").where("item_code").anyOf(codeChunk).toArray();
+			const rows = await targetTable
+				.where("item_code")
+				.anyOf(codeChunk)
+				.filter((row: any) =>
+					catalogState
+						? row?.profile_scope === normalizedScope &&
+							row?.catalog_generation ===
+								catalogState.active_generation
+						: !normalizedScope ||
+							isMatchingScope(row, normalizedScope),
+				)
+				.toArray();
 			if (Array.isArray(rows) && rows.length) {
 				existingRows.push(...rows);
 			}
@@ -387,35 +871,19 @@ export async function saveItems(items, scope = "") {
 			existingRows.map((row: any) => [row.item_code, row]),
 		);
 
-		for (let i = 0; i < incomingItems.length; i += CHUNK_SIZE) {
-			const itemChunk = incomingItems.slice(i, i + CHUNK_SIZE);
-			type DerivedItem = ReturnType<typeof deriveItemSearchFields>;
-			const scopedItems = itemChunk
-				.map((it) => {
-					const existing = (existingByCode.get(it.item_code) ||
-						{}) as Record<string, any>;
-					const merged = {
-						...existing,
-						...it,
-						profile_scope:
-							scope ||
-							it?.profile_scope ||
-							existing?.profile_scope ||
-							"",
-					};
-					const cloneSafeMerged =
-						toCloneSafeValue<SearchableItem>(merged);
-					if (!cloneSafeMerged?.item_code) {
-						return null;
-					}
-					return deriveItemSearchFields(cloneSafeMerged);
-				})
-				.filter((row): row is DerivedItem => !!row);
+		for (let i = 0; i < incomingItems.length; i += ITEM_WRITE_CHUNK_SIZE) {
+			const itemChunk = incomingItems.slice(i, i + ITEM_WRITE_CHUNK_SIZE);
+			const scopedItems = normalizeCatalogRows(
+				itemChunk,
+				normalizedScope,
+				catalogState?.active_generation || null,
+				existingByCode,
+			);
 			if (!scopedItems.length) {
 				continue;
 			}
 			try {
-				await db.table("items").bulkPut(scopedItems);
+				await targetTable.bulkPut(scopedItems);
 			} catch (bulkError) {
 				console.warn(
 					"bulkPut failed for items chunk; retrying one-by-one",
@@ -423,7 +891,7 @@ export async function saveItems(items, scope = "") {
 				);
 				for (const row of scopedItems) {
 					try {
-						await db.table("items").put(row);
+						await targetTable.put(row);
 					} catch (rowError) {
 						console.error("Failed to save item row", {
 							item_code: row?.item_code,
@@ -446,10 +914,39 @@ export async function clearStoredItems(scope = "") {
 			console.warn(
 				"clearStoredItems called without scope; clearing all cached items.",
 			);
-			await db.table("items").clear();
+			await db.transaction(
+				"rw",
+				db.table("items"),
+				db.table(ITEM_CATALOG_ROWS_TABLE),
+				db.table(ITEM_CATALOG_STATE_TABLE),
+				async () => {
+					await Promise.all([
+						db.table("items").clear(),
+						db.table(ITEM_CATALOG_ROWS_TABLE).clear(),
+						db.table(ITEM_CATALOG_STATE_TABLE).clear(),
+					]);
+				},
+			);
 			return;
 		}
-		await filterByScope(db.table("items"), scope).delete();
+		const normalizedScope = normalizeScope(scope).trim();
+		await db.transaction(
+			"rw",
+			db.table("items"),
+			db.table(ITEM_CATALOG_ROWS_TABLE),
+			db.table(ITEM_CATALOG_STATE_TABLE),
+			async () => {
+				await Promise.all([
+					filterByScope(db.table("items"), normalizedScope).delete(),
+					db
+						.table(ITEM_CATALOG_ROWS_TABLE)
+						.where("profile_scope")
+						.equals(normalizedScope)
+						.delete(),
+					db.table(ITEM_CATALOG_STATE_TABLE).delete(normalizedScope),
+				]);
+			},
+		);
 	} catch (e) {
 		console.error("Failed to clear stored items", e);
 	}
@@ -511,13 +1008,32 @@ export async function deleteStoredItemsByCodes(
 			return;
 		}
 
+		const normalizedScope = normalizeScope(scope).trim();
+		const state = await getItemCatalogState(normalizedScope);
+		if (state) {
+			const keys = await db
+				.table(ITEM_CATALOG_ROWS_TABLE)
+				.where("item_code")
+				.anyOf(normalizedCodes)
+				.filter(
+					(row: any) =>
+						row?.profile_scope === normalizedScope &&
+						row?.catalog_generation === state.active_generation,
+				)
+				.primaryKeys();
+			if (keys.length) {
+				await db.table(ITEM_CATALOG_ROWS_TABLE).bulkDelete(keys);
+			}
+			return;
+		}
+
 		const existingRows = await db
 			.table("items")
 			.where("item_code")
 			.anyOf(normalizedCodes)
 			.toArray();
 		const matchingCodes = existingRows
-			.filter((row: any) => isMatchingScope(row, scope))
+			.filter((row: any) => isMatchingScope(row, normalizedScope))
 			.map((row: any) => row?.item_code)
 			.filter(Boolean);
 
@@ -571,6 +1087,36 @@ export function getCachedPriceListItems(priceList) {
 		return null;
 	} catch (e) {
 		console.error("Failed to get cached price list items", e);
+		return null;
+	}
+}
+
+export async function getCachedItemPriceForUom({
+	priceList,
+	itemCode,
+	uom,
+	customer = null,
+	currency = null,
+	date = null,
+}: {
+	priceList: string;
+	itemCode: string;
+	uom: string;
+	customer?: string | null;
+	currency?: string | null;
+	date?: string | null;
+}) {
+	try {
+		return await itemPriceRepository.findApplicableForItemAndUom({
+			priceList,
+			itemCode,
+			uom,
+			customer,
+			currency,
+			date,
+		});
+	} catch (error) {
+		console.error("Failed to resolve cached UOM Item Price", error);
 		return null;
 	}
 }
@@ -642,9 +1188,7 @@ export function removeCachedPriceListItems(
 		}
 
 		const cache = memory.price_list_cache || {};
-		const targetLists = priceList
-			? [priceList]
-			: Object.keys(cache || {});
+		const targetLists = priceList ? [priceList] : Object.keys(cache || {});
 
 		targetLists.forEach((targetPriceList) => {
 			const cachedEntry = cache[targetPriceList];
@@ -654,7 +1198,10 @@ export function removeCachedPriceListItems(
 			cache[targetPriceList] = {
 				...cachedEntry,
 				items: cachedEntry.items.filter(
-					(entry) => !normalizedCodes.has(String(entry?.item_code || "").trim()),
+					(entry) =>
+						!normalizedCodes.has(
+							String(entry?.item_code || "").trim(),
+						),
 				),
 				timestamp: Date.now(),
 			};
@@ -676,6 +1223,8 @@ export function saveItemDetailsCache(profileName, priceList, items) {
 		try {
 			cleanItems = items.map((it) => ({
 				item_code: it.item_code,
+				stock_uom: it.stock_uom,
+				conversion_factor: it.conversion_factor,
 				actual_qty: it.actual_qty,
 				serial_no_data: it.serial_no_data,
 				batch_no_data: it.batch_no_data,
@@ -684,6 +1233,11 @@ export function saveItemDetailsCache(profileName, priceList, items) {
 				item_uoms: it.item_uoms,
 				rate: it.rate,
 				price_list_rate: it.price_list_rate,
+				trade_price: it.trade_price,
+				buying_rate: it.buying_rate,
+				buying_price_list: it.buying_price_list,
+				buying_price_currency: it.buying_price_currency,
+				_buying_prices_by_uom: it._buying_prices_by_uom,
 			}));
 			cleanItems = JSON.parse(JSON.stringify(cleanItems));
 		} catch (err) {
@@ -703,6 +1257,121 @@ export function saveItemDetailsCache(profileName, priceList, items) {
 	} catch (e) {
 		console.error("Failed to cache item details", e);
 	}
+}
+
+async function attachOfflineBuyingFloors(profileName: string, items: any[]) {
+	if (!profileName || !items.length) return items;
+	const profile = await db.table("pos_profiles").get(profileName);
+	const buyingPriceList = String(profile?.buying_price_list || "").trim();
+	if (!buyingPriceList) return items;
+
+	const itemCodes = new Set(
+		items.map((item) => String(item?.item_code || "")),
+	);
+	const today = new Date().toISOString().slice(0, 10);
+	const priceRows = await db
+		.table("item_price_records")
+		.where("price_list")
+		.equals(buyingPriceList)
+		.filter(
+			(row) =>
+				itemCodes.has(String(row?.item_code || "")) &&
+				!row?.customer &&
+				!row?.supplier &&
+				(!row?.valid_from ||
+					String(row.valid_from).slice(0, 10) <= today) &&
+				(!row?.valid_upto ||
+					String(row.valid_upto).slice(0, 10) >= today),
+		)
+		.toArray();
+	if (!priceRows.length) return items;
+
+	const companyCurrency = String(
+		profile?.company_currency || profile?.currency || "",
+	);
+	const currencyRates = new Map<string, number>();
+	const toCompanyRate = async (currency: string) => {
+		if (!currency || !companyCurrency || currency === companyCurrency)
+			return 1;
+		if (currencyRates.has(currency))
+			return currencyRates.get(currency) || 0;
+		const rows = await db
+			.table("currency_rate_records")
+			.where("[profile_name+company+from_currency+to_currency]")
+			.equals([
+				profileName,
+				String(profile?.company || ""),
+				currency,
+				companyCurrency,
+			])
+			.toArray();
+		const selected = rows
+			.filter(
+				(row) => !row?.date || String(row.date).slice(0, 10) <= today,
+			)
+			.sort((left, right) =>
+				String(right?.date || right?.modified || "").localeCompare(
+					String(left?.date || left?.modified || ""),
+				),
+			)[0];
+		const rate = Number(selected?.exchange_rate || 0);
+		currencyRates.set(currency, Number.isFinite(rate) ? rate : 0);
+		return currencyRates.get(currency) || 0;
+	};
+
+	const rowsByItem = new Map<string, any[]>();
+	for (const row of priceRows) {
+		const itemCode = String(row.item_code || "");
+		const rows = rowsByItem.get(itemCode) || [];
+		rows.push(row);
+		rowsByItem.set(itemCode, rows);
+	}
+
+	for (const item of items) {
+		const buyingRows = rowsByItem.get(String(item?.item_code || "")) || [];
+		buyingRows.sort((left, right) =>
+			String(right?.valid_from || right?.modified || "").localeCompare(
+				String(left?.valid_from || left?.modified || ""),
+			),
+		);
+		const pricesByUom: Record<string, any> = {};
+		for (const row of buyingRows) {
+			const uom = String(row?.uom || "");
+			if (pricesByUom[uom]) continue;
+			const rate = Number(row?.price_list_rate || 0);
+			const exchangeRate = await toCompanyRate(
+				String(row?.currency || ""),
+			);
+			if (!Number.isFinite(rate) || rate <= 0 || exchangeRate <= 0)
+				continue;
+			pricesByUom[uom] = {
+				price_list_rate: rate,
+				base_price_list_rate: rate * exchangeRate,
+				currency: row?.currency || companyCurrency,
+				price_list: buyingPriceList,
+			};
+		}
+		if (Object.keys(pricesByUom).length) {
+			item._buying_prices_by_uom = pricesByUom;
+			item.buying_price_list = buyingPriceList;
+		}
+	}
+	return items;
+}
+
+export async function setProfileBuyingPriceList(
+	profile: any,
+	buyingPriceList: string | null | undefined,
+) {
+	if (!profile?.name || !buyingPriceList) return;
+	await checkDbHealth();
+	if (!db.isOpen()) await db.open();
+	const current =
+		(await db.table("pos_profiles").get(profile.name)) || profile;
+	await db.table("pos_profiles").put({
+		...current,
+		buying_price_list: buyingPriceList,
+	});
 }
 
 /**
@@ -755,6 +1424,7 @@ export async function getCachedItemDetails(
 				const base = map.get(det.item_code) || {};
 				cached[idx] = { ...base, ...det };
 			});
+			await attachOfflineBuyingFloors(profileName, cached);
 		}
 
 		return { cached, missing };
@@ -894,7 +1564,10 @@ export function refreshBootstrapSnapshotFromCacheState(cacheState = {}) {
 			}),
 		);
 	} catch (e) {
-		console.error("Failed to refresh bootstrap snapshot from cache state", e);
+		console.error(
+			"Failed to refresh bootstrap snapshot from cache state",
+			e,
+		);
 	}
 }
 
@@ -969,8 +1642,7 @@ async function persistOpeningEntities(data: any) {
 		if (openingShift?.name) {
 			await db.table("opening_shifts").put({
 				...openingShift,
-				pos_profile:
-					openingShift?.pos_profile || profile?.name || "",
+				pos_profile: openingShift?.pos_profile || profile?.name || "",
 			});
 		}
 	} catch (e) {
@@ -1008,7 +1680,9 @@ export function setOpeningStorage(data) {
 
 export function clearOpeningStorage() {
 	try {
-		const previousOpeningData = cloneOpeningData(memory.pos_opening_storage);
+		const previousOpeningData = cloneOpeningData(
+			memory.pos_opening_storage,
+		);
 		memory.pos_opening_storage = null;
 		persist("pos_opening_storage");
 		void clearPersistedOpeningShift(previousOpeningData);
@@ -1325,8 +1999,9 @@ export function saveDeliveryChargesCache(
 		memory.delivery_charges_cache = cache;
 		persist("delivery_charges_cache");
 		refreshBootstrapSnapshotFromCacheState({
-			deliveryChargesCount: Object.keys(memory.delivery_charges_cache || {})
-				.length,
+			deliveryChargesCount: Object.keys(
+				memory.delivery_charges_cache || {},
+			).length,
 		});
 	} catch (e) {
 		console.error("Failed to save delivery charges cache", e);
@@ -1365,8 +2040,9 @@ export function saveCurrencyOptionsCache(profileName, currencies) {
 		memory.currency_options_cache = cache;
 		persist("currency_options_cache");
 		refreshBootstrapSnapshotFromCacheState({
-			currencyOptionsCount: Object.keys(memory.currency_options_cache || {})
-				.length,
+			currencyOptionsCount: Object.keys(
+				memory.currency_options_cache || {},
+			).length,
 		});
 	} catch (e) {
 		console.error("Failed to save currency options cache", e);
@@ -1410,7 +2086,8 @@ export function saveExchangeRateCache(entry: ExchangeRateCacheEntry = {}) {
 		memory.exchange_rate_cache = cache;
 		persist("exchange_rate_cache");
 		refreshBootstrapSnapshotFromCacheState({
-			exchangeRateCount: Object.keys(memory.exchange_rate_cache || {}).length,
+			exchangeRateCount: Object.keys(memory.exchange_rate_cache || {})
+				.length,
 		});
 	} catch (e) {
 		console.error("Failed to save exchange rate cache", e);

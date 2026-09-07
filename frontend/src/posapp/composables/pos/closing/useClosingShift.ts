@@ -214,6 +214,7 @@ export function useClosingShift(eventBus: any) {
 			loyalty_redemption: normalizeLoyaltyRedemption(
 				payload.loyalty_redemption,
 			),
+			customer_credit_redeemed: normalizeCredit(payload.customer_credit_redeemed),
 			cash_expected: {
 				mode_of_payment: payload.cash_expected?.mode_of_payment || "",
 				company_currency_total: toNumber(
@@ -270,7 +271,7 @@ export function useClosingShift(eventBus: any) {
 			dialog_data.value.payments ||
 			[];
 		const invalid = payments.some((p: any) =>
-			isNaN(parseFloat(p.closing_amount)),
+			isNaN(parseFloat(p.closing_amount_in_currency ?? p.closing_amount)),
 		);
 		if (invalid) {
 			return false;

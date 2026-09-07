@@ -1,5 +1,9 @@
 import { computed, unref, type Ref } from "vue";
 import { formatUtils } from "../../../format";
+import {
+	fromCompanyCurrency,
+	toCompanyCurrency,
+} from "../../../utils/erpnextCurrency";
 
 declare const window: any;
 declare const __: (_text: string, _args?: any[]) => string;
@@ -44,6 +48,11 @@ export function usePaymentCalculations(options: PaymentCalculationOptions) {
 			: parseFloat(String(val)) || 0;
 	};
 
+	const currencyContext = (doc = unref(invoiceDoc)) => ({
+		...(doc || {}),
+		pos_profile: unref(posProfile),
+	});
+
 	/**
 	 * Performance: normalize payment amounts once per reactive update.
 	 */
@@ -78,7 +87,7 @@ export function usePaymentCalculations(options: PaymentCalculationOptions) {
 
 		if (lAmount && doc) {
 			if (doc.currency && doc.currency !== profile.currency) {
-				total += flt(lAmount / (doc.conversion_rate || 1));
+				total += flt(fromCompanyCurrency(currencyContext(doc), lAmount));
 			} else {
 				total += flt(lAmount);
 			}
@@ -86,7 +95,7 @@ export function usePaymentCalculations(options: PaymentCalculationOptions) {
 
 		if (rCredit && doc) {
 			if (doc.currency && doc.currency !== profile.currency) {
-				total += flt(rCredit / (doc.conversion_rate || 1));
+				total += flt(fromCompanyCurrency(currencyContext(doc), rCredit));
 			} else {
 				total += flt(rCredit);
 			}
@@ -119,7 +128,7 @@ export function usePaymentCalculations(options: PaymentCalculationOptions) {
 		if (info?.loyalty_points && doc) {
 			amount = info.loyalty_points * (info.conversion_factor || 1);
 			if (doc.currency !== profile.currency) {
-				amount = flt(amount / (doc.conversion_rate || 1));
+				amount = flt(fromCompanyCurrency(currencyContext(doc), amount));
 			}
 		}
 		return amount;
@@ -127,20 +136,10 @@ export function usePaymentCalculations(options: PaymentCalculationOptions) {
 
 	const diff_payment = computed(() => {
 		const doc = unref(invoiceDoc);
-		const profile = unref(posProfile);
 		if (!doc) return 0;
 
-		let invoice_total;
-		if (
-			profile.posa_allow_multi_currency &&
-			doc.currency !== profile.currency
-		) {
-			invoice_total = flt(doc.grand_total);
-		} else {
-			invoice_total = flt(doc.rounded_total || doc.grand_total);
-		}
-
-		let diff = flt(invoice_total - total_payments.value);
+		const invoiceTotal = flt(doc.rounded_total || doc.grand_total);
+		const diff = flt(invoiceTotal - total_payments.value);
 		// For returns: negative diff means more refund needed, positive means over-refunded (cap to 0)
 		if (doc.is_return) return diff > 0 ? 0 : diff;
 		return diff;
@@ -148,21 +147,58 @@ export function usePaymentCalculations(options: PaymentCalculationOptions) {
 
 	const change_due = computed(() => {
 		const doc = unref(invoiceDoc);
-		const profile = unref(posProfile);
 		if (!doc) return 0;
 
-		let invoice_total;
-		if (
-			profile.posa_allow_multi_currency &&
-			doc.currency !== profile.currency
-		) {
-			invoice_total = flt(doc.grand_total);
-		} else {
-			invoice_total = flt(doc.rounded_total || doc.grand_total);
+		const invoiceTotal = flt(doc.rounded_total || doc.grand_total);
+		const change = flt(total_payments.value - invoiceTotal);
+		return change > 0 ? change : 0;
+	});
+
+	const base_settlement = computed(() => {
+		const doc = unref(invoiceDoc);
+		if (!doc) {
+			return { paid: 0, target: 0, difference: 0, remaining: 0, change: 0 };
 		}
 
-		let change = flt(total_payments.value - invoice_total);
-		return change > 0 ? change : 0;
+		const invoiceTotal = flt(doc.rounded_total || doc.grand_total);
+		const explicitBaseTotal = doc.base_rounded_total || doc.base_grand_total;
+		const target = flt(
+			explicitBaseTotal || toCompanyCurrency(currencyContext(doc), invoiceTotal),
+		);
+		let paid = paymentAmountSummary.value.payments.reduce((sum, payment) => {
+			const baseAmount = payment?.base_amount;
+			return (
+				sum +
+				flt(
+					baseAmount !== undefined && baseAmount !== null
+						? baseAmount
+						: toCompanyCurrency(currencyContext(doc), payment?.amount || 0),
+				)
+			);
+		}, 0);
+
+		paid += flt(unref(loyaltyAmount) || 0);
+		paid += flt(unref(redeemedCustomerCredit) || 0);
+		const giftCardRows = giftCardRedemptions ? unref(giftCardRedemptions) : [];
+		if (Array.isArray(giftCardRows)) {
+			paid += giftCardRows.reduce(
+				(sum, row) =>
+					sum + flt(toCompanyCurrency(currencyContext(doc), row?.amount || 0)),
+				0,
+			);
+		}
+
+		paid = flt(paid);
+		const difference = Number(
+			(target - paid).toFixed(unref(currencyPrecision)),
+		);
+		return {
+			paid,
+			target,
+			difference,
+			remaining: difference > 0 ? difference : 0,
+			change: difference < 0 ? Math.abs(difference) : 0,
+		};
 	});
 
 	const isCashLikePayment = (payment: any) => {
@@ -224,6 +260,7 @@ export function usePaymentCalculations(options: PaymentCalculationOptions) {
 		diff_payment,
 		diff_payment_display,
 		change_due,
+		base_settlement,
 		diff_label,
 		available_points_amount,
 		available_customer_credit,

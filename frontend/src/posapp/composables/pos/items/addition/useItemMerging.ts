@@ -176,9 +176,10 @@ export function useItemMerging() {
 				);
 				return;
 			}
-			// Optimised store method would be better, but composing actions works:
-			context.invoiceStore.removeItemByRowId(rowId);
-			context.invoiceStore.addItem(target, 0); // Insert at 0
+			// Re-order in place. Removing and re-adding briefly drops this row from
+			// the store totals and clones the item, causing a visible totals flash and
+			// breaking the stored object's identity.
+			context.invoiceStore.moveRowToTop(rowId);
 		} else {
 			const resolvedIndex =
 				typeof currentIndex === "number" && currentIndex >= 0

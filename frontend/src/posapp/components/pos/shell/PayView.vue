@@ -182,18 +182,23 @@
 						:party-account="partyAccount"
 						:payment-method-accounts="payment_method_accounts"
 						:available-bank-accounts="available_bank_accounts"
+						:allow-payment-currency-selection="allowPaymentCurrencySelection"
+						:allowed-payment-currencies="allowedPaymentCurrencies"
 						:payment-type="paymentEntryType"
 						:invoice-conversion-rate="invoiceConversionRate"
 						@validate-exchange-rate="validateExchangeRate"
 						@fetch-exchange-rate="fetchExchangeRate"
 						@update:bank-account="handleBankAccountChange"
+						@update:payment-currency="handlePaymentCurrencyChange"
 					/>
 
 					<PayActionButtons
 						:loading="isSubmitting"
+						:share-loading="isSharingPayment"
 						:disabled="false"
 						@submit="submit"
 						@submit-and-print="submit_and_print"
+						@share-last-payment="share_last_payment"
 					/>
 				</v-card>
 			</v-col>
@@ -224,7 +229,12 @@ import {
 	silentPrint,
 	watchPrintWindow,
 } from "../../../plugins/print";
-import { printDocumentViaQz } from "../../../services/qzTray";
+import {
+	confirmDocumentPrintFallback,
+	printDocumentViaConfiguredQz,
+	shouldUseConfiguredQzDocumentPrinting,
+	shouldUseRawDocumentPrinting,
+} from "../../../services/documentPrint";
 
 import { useRtl } from "../../../composables/core/useRtl";
 import { useCustomersStore } from "../../../stores/customersStore.js";
@@ -236,6 +246,8 @@ import { getValidCachedOpeningForCurrentUser } from "../../../utils/openingCache
 import { usePosPayData } from "../../../composables/pos/payments/usePosPayData";
 import { usePosPaySelection } from "../../../composables/pos/payments/usePosPaySelection";
 import { usePosPaySubmission } from "../../../composables/pos/payments/usePosPaySubmission";
+import { usePaymentSharing } from "../../../composables/pos/payments/usePaymentSharing";
+import { resolveExchangeRate } from "../../../services/exchangeRateResolver";
 import {
 	getAllowedPartyTypes,
 	normalizePartyTypeForPaymentType,
@@ -254,7 +266,7 @@ import {
 	buildPaymentRouteLoadingMessage,
 	isPaymentRouteLocked as resolvePaymentRouteLocked,
 } from "../../../utils/paymentRouteReadiness";
-import { loadPaymentMethodCurrencyMap } from "../../../utils/paymentMethodCurrencyCache";
+import { DEFAULT_PAYMENT_ENTRY_PRINT_FORMAT } from "../../../utils/paymentPrintFormat";
 
 const getTodayDate = () => frappe?.datetime?.nowdate?.() || new Date().toISOString().slice(0, 10);
 const formatDisplayDate = (date) => {
@@ -416,19 +428,32 @@ export default {
 				"&trigger_print=1";
 			url = appendDebugPrintParam(url, debugPrint);
 			const printOptions = { allowOfflineFallback: isOffline(), triggerPrint: "1", debugPrint };
-			if (pos_profile.value?.posa_silent_print) {
+			const useRawPrint = shouldUseRawDocumentPrinting(pos_profile.value);
+			if (shouldUseConfiguredQzDocumentPrinting(pos_profile.value)) {
 				if (!isOffline()) {
 					try {
-						await printDocumentViaQz({
+						await printDocumentViaConfiguredQz({
 							doctype: "Payment Entry",
 							name: payment_name,
-							printFormat: "Standard",
+							profile: pos_profile.value,
+							printFormat: DEFAULT_PAYMENT_ENTRY_PRINT_FORMAT,
 							noLetterhead: 1,
 						});
 						return;
 					} catch (error) {
-						console.warn("QZ Tray print failed, falling back to browser print", error);
+						console.warn("QZ Tray print failed", error);
+						if (confirmDocumentPrintFallback(error, { raw: useRawPrint })) {
+							silentPrint(url, printOptions);
+						}
+						return;
 					}
+				}
+				if (useRawPrint) {
+					const offlineError = new Error("Raw printing is not available while the POS is offline.");
+					if (confirmDocumentPrintFallback(offlineError, { raw: true, offline: true })) {
+						silentPrint(url, printOptions);
+					}
+					return;
 				}
 				silentPrint(url, printOptions);
 			} else {
@@ -460,7 +485,7 @@ export default {
 		});
 
 		const companyCurrencyLocal = computed(
-			() => companyCurrency.value || pos_profile.value?.currency || "USD",
+			() => companyCurrency.value || pos_profile.value?.currency || "",
 		);
 		const requiresExchangeRate = computed(
 			() => invoiceTotalCurrency.value !== companyCurrencyLocal.value,
@@ -469,7 +494,8 @@ export default {
 		const total_outstanding_amount = computed(() => {
 			if (!outstanding_invoices.value.length) return 0;
 			return outstanding_invoices.value.reduce(
-				(acc, cur) => acc + flt(cur?.outstanding_amount_in_invoice_currency ?? cur?.outstanding_amount ?? 0),
+				(acc, cur) =>
+					acc + flt(cur?.outstanding_amount_in_invoice_currency ?? cur?.outstanding_amount ?? 0),
 				0,
 			);
 		});
@@ -515,7 +541,9 @@ export default {
 						invoice_currency: invoiceCurr,
 					};
 				}
-				summary[key].amount += flt(inv.outstanding_amount_in_invoice_currency ?? inv.outstanding_amount ?? 0);
+				summary[key].amount += flt(
+					inv.outstanding_amount_in_invoice_currency ?? inv.outstanding_amount ?? 0,
+				);
 			});
 			return summary;
 		});
@@ -528,32 +556,46 @@ export default {
 		});
 
 		const getPaymentMethodCurrency = (mode) =>
-			payment_method_currencies.value[mode] || pos_profile.value.currency;
+			payment_methods.value.find((method) => method.mode_of_payment === mode)?.payment_currency ||
+			payment_method_currencies.value[mode] ||
+			pos_profile.value.currency;
+
+		const multiCurrencyPaymentsEnabled = computed(
+			() => Number(pos_profile.value?.posa_enable_multi_currency_payments || 0) === 1,
+		);
+		const allowPaymentCurrencySelection = computed(
+			() =>
+				multiCurrencyPaymentsEnabled.value &&
+				Number(pos_profile.value?.posa_allow_payment_currency_selection || 0) === 1,
+		);
+		const allowedPaymentCurrencies = computed(() => {
+			const configured = (pos_profile.value?.posa_allowed_currencies || [])
+				.filter((row) => row?.currency && Number(row.allow_for_payments ?? 1) === 1)
+				.map((row) => row.currency);
+			return [...new Set([
+				...(configured.length
+					? configured
+					: [pos_profile.value?.currency, companyCurrency.value]),
+			].filter(Boolean))];
+		});
 
 		const filtered_payment_methods = computed(() => {
 			if (!payment_methods.value.length) return [];
 			return payment_methods.value;
 		});
 
-		const rateFromCurrencyToCompany = (currency) => {
-			if (!currency || currency === companyCurrencyLocal.value) return 1;
-			if (currency === invoiceTotalCurrency.value) return flt(exchangeRate.value || 1);
-			return flt(invoiceConversionRate.value || exchangeRate.value || 1);
-		};
-
 		const new_payments_detail = computed(() => {
 			if (!filtered_payment_methods.value.length) return [];
 			return filtered_payment_methods.value
 				.filter((m) => flt(m.amount) > 0)
 				.map((m) => {
-					const mopCurrency = getPaymentMethodCurrency(m.mode_of_payment);
-					const rate = rateFromCurrencyToCompany(mopCurrency);
+					const mopCurrency = m.payment_currency || getPaymentMethodCurrency(m.mode_of_payment);
 					return {
 						mode_of_payment: m.mode_of_payment,
 						paid_amount: flt(m.amount),
 						currency: mopCurrency,
 						received_amount: flt(m.amount),
-						exchange_rate: rate,
+						exchange_rate: m.company_exchange_rate || null,
 					};
 				});
 		});
@@ -659,6 +701,11 @@ export default {
 			autoAllocatePaymentAmount,
 			autoReconcile,
 		});
+		const { isSharing: isSharingPayment, shareLastPayment: share_last_payment } = usePaymentSharing({
+			customerName: customer_name,
+			partyType,
+			eventBus: proxy?.eventBus,
+		});
 
 		const fetchCompanyCurrency = async () => {
 			if (!company.value) return;
@@ -671,16 +718,16 @@ export default {
 						fieldname: "default_currency",
 					},
 				});
-				companyCurrency.value = r.message?.default_currency || pos_profile.value?.currency || "USD";
+				companyCurrency.value = r.message?.default_currency || pos_profile.value?.currency || "";
 			} catch (e) {
 				console.error("Failed to fetch company currency", e);
-				companyCurrency.value = pos_profile.value?.currency || "USD";
+				companyCurrency.value = pos_profile.value?.currency || "";
 			}
 		};
 
 		const fetchExchangeRate = async () => {
 			if (exchangeRateLoading.value || !requiresExchangeRate.value) {
-				exchangeRate.value = 1;
+				exchangeRate.value = requiresExchangeRate.value ? null : 1;
 				return;
 			}
 			if (!invoiceTotalCurrency.value || !companyCurrencyLocal.value) {
@@ -689,27 +736,25 @@ export default {
 			exchangeRateLoading.value = true;
 			exchangeRateError.value = null;
 			try {
-				const r = await frappe.call({
-					method: "erpnext.setup.utils.get_exchange_rate",
-					args: {
-						from_currency: invoiceTotalCurrency.value,
-						to_currency: companyCurrencyLocal.value,
-						transaction_date: postingDate.value || getTodayDate(),
-						args: "for_selling",
-					},
+				const result = await resolveExchangeRate({
+					profileName: pos_profile.value?.name,
+					company: company.value,
+					fromCurrency: invoiceTotalCurrency.value,
+					toCurrency: companyCurrencyLocal.value,
+					effectiveDate: postingDate.value || getTodayDate(),
+					purpose: "for_selling",
 				});
-				exchangeRate.value = flt(r.message || 1);
+				if (!result.found || !result.rate) throw new Error(__("Exchange rate unavailable"));
+				exchangeRate.value = result.rate;
 			} catch (e) {
 				exchangeRateError.value = e.message;
-				exchangeRate.value = 1;
+				exchangeRate.value = null;
 			} finally {
 				exchangeRateLoading.value = false;
 			}
 		};
 
-		const validateExchangeRate = () => {
-			if (!exchangeRate.value || exchangeRate.value <= 0) exchangeRate.value = 1;
-		};
+		const validateExchangeRate = () => Boolean(exchangeRate.value && exchangeRate.value > 0);
 
 		const set_payment_methods = () => {
 			if (!pos_profile.value?.posa_allow_make_new_payments) return;
@@ -718,8 +763,75 @@ export default {
 				amount: 0,
 				row_id: m.name,
 				bank_account: null,
+				payment_currency: null,
+				invoice_equivalent: 0,
+				invoice_exchange_rate: null,
 			}));
 		};
+
+		const resolvePaymentMethodRate = async (method) => {
+			const selectedAccount = (available_bank_accounts.value?.[method.mode_of_payment] || []).find(
+				(account) => account.account === method.bank_account,
+			);
+			const paymentCurrency =
+				method.payment_currency ||
+				selectedAccount?.account_currency ||
+				getPaymentMethodCurrency(method.mode_of_payment);
+			if (!paymentCurrency || !invoiceTotalCurrency.value || !companyCurrencyLocal.value) return;
+			const common = {
+				profileName: pos_profile.value?.name,
+				company: company.value,
+				fromCurrency: paymentCurrency,
+				effectiveDate: postingDate.value || getTodayDate(),
+			};
+			const [invoiceResult, companyResult] = await Promise.all([
+				resolveExchangeRate({ ...common, toCurrency: invoiceTotalCurrency.value }),
+				resolveExchangeRate({ ...common, toCurrency: companyCurrencyLocal.value }),
+			]);
+			method.payment_currency = paymentCurrency;
+			method._rate_error = !invoiceResult.found || !companyResult.found;
+			method.invoice_equivalent = invoiceResult.rate
+				? flt(flt(method.amount) * invoiceResult.rate)
+				: 0;
+			method.company_exchange_rate = companyResult.rate || null;
+			method.invoice_exchange_rate = invoiceResult.rate || null;
+			method.rate_date = invoiceResult.rateDate || null;
+			method.rate_source = invoiceResult.source || null;
+		};
+
+		watch(
+			() => payment_methods.value.map((m) => [m.mode_of_payment, m.amount, m.bank_account, getPaymentMethodCurrency(m.mode_of_payment)]),
+			() => payment_methods.value.forEach((method) => void resolvePaymentMethodRate(method)),
+			{ deep: true },
+		);
+
+		const normalizeSelectedPayment = async (row, amountField) => {
+			const fromCurrency = row.currency || pos_profile.value?.currency;
+			const toCurrency = invoiceTotalCurrency.value;
+			if (!fromCurrency || !toCurrency) return;
+			const result = await resolveExchangeRate({
+				profileName: pos_profile.value?.name,
+				company: company.value,
+				fromCurrency,
+				toCurrency,
+				effectiveDate: postingDate.value || getTodayDate(),
+			});
+			row._rate_error = !result.found;
+			row.invoice_equivalent = result.rate ? flt(row?.[amountField] || 0) * result.rate : 0;
+		};
+
+		watch(
+			() => [
+				invoiceTotalCurrency.value,
+				...selected_payments.value.map((row) => `${row.name}:${row.unallocated_amount}:${row.currency}`),
+				...selected_mpesa_payments.value.map((row) => `${row.name}:${row.amount}:${row.currency}`),
+			],
+			() => {
+				selected_payments.value.forEach((row) => void normalizeSelectedPayment(row, "unallocated_amount"));
+				selected_mpesa_payments.value.forEach((row) => void normalizeSelectedPayment(row, "amount"));
+			},
+			{ deep: true },
+		);
 
 		const loadPaymentMethodCurrencies = async () => {
 			if (!pos_profile.value?.payments?.length || !company.value) return;
@@ -738,6 +850,28 @@ export default {
 				payment_method_currencies.value = currencies;
 				// Fetch available accounts for all modes
 				await Promise.all(modes.map((mode) => fetchAvailableAccounts(mode)));
+				payment_methods.value.forEach((method) => {
+					const profileRow = pos_profile.value.payments.find(
+						(row) => row.mode_of_payment === method.mode_of_payment,
+					);
+					const preferredCurrency =
+						profileRow?.posa_default_payment_currency ||
+						pos_profile.value?.posa_default_payment_currency ||
+						currencies[method.mode_of_payment] ||
+						pos_profile.value?.currency;
+					const accounts = available_bank_accounts.value[method.mode_of_payment] || [];
+					const allowed = allowedPaymentCurrencies.value.includes(preferredCurrency);
+					const matchingAccount = accounts.find(
+						(account) => account.account_currency === preferredCurrency,
+					);
+					const defaultAccount = accountData[method.mode_of_payment]?.account || null;
+					method.payment_currency =
+						multiCurrencyPaymentsEnabled.value && allowed
+							? preferredCurrency
+							: currencies[method.mode_of_payment] || null;
+					method.bank_account = matchingAccount?.account || defaultAccount;
+					void resolvePaymentMethodRate(method);
+				});
 			} catch (e) {
 				console.error("Failed to load payment method accounts", e);
 			}
@@ -787,9 +921,7 @@ export default {
 				method.bank_account = bankAccount;
 				// Update currency map when account changes
 				if (bankAccount && available_bank_accounts.value[mode]) {
-					const acct = available_bank_accounts.value[mode].find(
-						(a) => a.account === bankAccount,
-					);
+					const acct = available_bank_accounts.value[mode].find((a) => a.account === bankAccount);
 					if (acct) {
 						payment_method_currencies.value = {
 							...payment_method_currencies.value,
@@ -806,6 +938,13 @@ export default {
 					}
 				}
 			}
+		};
+
+		const handlePaymentCurrencyChange = (mode, currency) => {
+			const method = payment_methods.value.find((row) => row.mode_of_payment === mode);
+			if (!method || !allowedPaymentCurrencies.value.includes(currency)) return;
+			method.payment_currency = currency;
+			void resolvePaymentMethodRate(method);
 		};
 
 		const applyOpeningData = async (data) => {
@@ -1213,6 +1352,8 @@ export default {
 			selected_payments,
 			selected_mpesa_payments,
 			payment_methods,
+			selected_payments_detail,
+			new_payments_detail,
 			total_selected_invoices,
 			total_selected_payments,
 			total_selected_mpesa_payments,
@@ -1223,6 +1364,7 @@ export default {
 			isInvoiceSelected,
 			clearSelections,
 			isSubmitting,
+			isSharingPayment,
 			processPayment,
 			invoiceTotalCurrency,
 			paymentTotalCurrency,
@@ -1237,6 +1379,8 @@ export default {
 			isPaymentRouteLocked,
 			paymentsLoadingMessage,
 			getPaymentMethodCurrency,
+			allowPaymentCurrencySelection,
+			allowedPaymentCurrencies,
 			fetchCompanyCurrency,
 			fetchExchangeRate,
 			validateExchangeRate,
@@ -1244,6 +1388,7 @@ export default {
 			loadPaymentMethodCurrencies,
 			fetchAvailableAccounts,
 			handleBankAccountChange,
+			handlePaymentCurrencyChange,
 			available_bank_accounts,
 			check_opening_entry,
 			syncPendingPayments,
@@ -1253,6 +1398,7 @@ export default {
 			handleInvoiceSelection,
 			submit,
 			submit_and_print,
+			share_last_payment,
 			rtlStyles,
 			rtlClasses,
 			customersStore,
@@ -1264,7 +1410,7 @@ export default {
 
 <style>
 .selected-row {
-	background-color: #e3f2fd !important;
+	background-color: var(--pos-selected-bg) !important;
 }
 
 .credit-note-row {

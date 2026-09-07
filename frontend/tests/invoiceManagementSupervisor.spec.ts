@@ -56,6 +56,7 @@ describe("InvoiceManagement supervisor scope", () => {
 			resolveSupervisorProfileScope: (InvoiceManagement as any).methods.resolveSupervisorProfileScope,
 			buildInvoiceFilters: (InvoiceManagement as any).methods.buildInvoiceFilters,
 			getInvoiceListFields: (InvoiceManagement as any).methods.getInvoiceListFields,
+			submittedInvoiceListArgs: (InvoiceManagement as any).methods.submittedInvoiceListArgs,
 			historyInvoices: [],
 			loading: false,
 			toastStore: { show: vi.fn() },
@@ -65,7 +66,7 @@ describe("InvoiceManagement supervisor scope", () => {
 
 		expect(callMock).toHaveBeenCalledWith(
 			expect.objectContaining({
-				method: "frappe.client.get_list",
+					method: "posawesome.posawesome.api.invoices.list_submitted_invoices",
 				args: expect.objectContaining({
 					filters: {
 						company: "Farooq Chemicals",
@@ -90,6 +91,7 @@ describe("InvoiceManagement supervisor scope", () => {
 			resolveSupervisorProfileScope: (InvoiceManagement as any).methods.resolveSupervisorProfileScope,
 			buildInvoiceFilters: (InvoiceManagement as any).methods.buildInvoiceFilters,
 			getInvoiceListFields: (InvoiceManagement as any).methods.getInvoiceListFields,
+			submittedInvoiceListArgs: (InvoiceManagement as any).methods.submittedInvoiceListArgs,
 			historyInvoices: [],
 			loading: false,
 			toastStore: { show: vi.fn() },
@@ -99,7 +101,7 @@ describe("InvoiceManagement supervisor scope", () => {
 
 		expect(callMock).toHaveBeenCalledWith(
 			expect.objectContaining({
-				method: "frappe.client.get_list",
+					method: "posawesome.posawesome.api.invoices.list_submitted_invoices",
 				args: expect.objectContaining({
 					filters: {
 						docstatus: 1,
@@ -125,6 +127,7 @@ describe("InvoiceManagement supervisor scope", () => {
 			resolveSupervisorProfileScope: (InvoiceManagement as any).methods.resolveSupervisorProfileScope,
 			buildInvoiceFilters: (InvoiceManagement as any).methods.buildInvoiceFilters,
 			getInvoiceListFields: (InvoiceManagement as any).methods.getInvoiceListFields,
+			submittedInvoiceListArgs: (InvoiceManagement as any).methods.submittedInvoiceListArgs,
 			historyInvoices: [],
 			loading: false,
 			toastStore: { show: vi.fn() },
@@ -136,7 +139,7 @@ describe("InvoiceManagement supervisor scope", () => {
 		expect(callMock).toHaveBeenNthCalledWith(
 			1,
 			expect.objectContaining({
-				method: "frappe.client.get_list",
+					method: "posawesome.posawesome.api.invoices.list_submitted_invoices",
 				args: expect.objectContaining({
 					doctype: "POS Invoice",
 				}),
@@ -145,7 +148,7 @@ describe("InvoiceManagement supervisor scope", () => {
 		expect(callMock).toHaveBeenNthCalledWith(
 			2,
 			expect.objectContaining({
-				method: "frappe.client.get_list",
+					method: "posawesome.posawesome.api.invoices.list_submitted_invoices",
 				args: expect.objectContaining({
 					doctype: "Sales Invoice",
 				}),

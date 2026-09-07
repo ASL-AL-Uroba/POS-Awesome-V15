@@ -43,16 +43,17 @@ describe("SyncCoordinator", () => {
 		]);
 
 		expect(runResource).toHaveBeenCalledTimes(2);
-		expect(runResource.mock.calls.map(([resource]) => resource.id)).toEqual([
-			"bootstrap_config",
-			"price_list_meta",
-		]);
+		expect(runResource.mock.calls.map(([resource]) => resource.id)).toEqual(
+			["bootstrap_config", "price_list_meta"],
+		);
 	});
 
 	it("runs resources in priority order for a trigger", async () => {
 		const resources = [
 			makeResource("items", "warm", ["online_resume"]),
-			makeResource("bootstrap_config", "boot_critical", ["online_resume"]),
+			makeResource("bootstrap_config", "boot_critical", [
+				"online_resume",
+			]),
 			makeResource("customers", "warm", ["online_resume"]),
 			makeResource("price_list_meta", "boot_critical", ["online_resume"]),
 		];
@@ -77,7 +78,9 @@ describe("SyncCoordinator", () => {
 
 	it("never exceeds configured concurrency while a trigger is running", async () => {
 		const resources = [
-			makeResource("bootstrap_config", "boot_critical", ["online_resume"]),
+			makeResource("bootstrap_config", "boot_critical", [
+				"online_resume",
+			]),
 			makeResource("price_list_meta", "boot_critical", ["online_resume"]),
 			makeResource("currency_matrix", "boot_critical", ["online_resume"]),
 			makeResource("payment_method_currencies", "boot_critical", [
@@ -121,7 +124,9 @@ describe("SyncCoordinator", () => {
 			},
 		});
 
-		await expect(coordinator.runTrigger("online_resume")).resolves.toBeUndefined();
+		await expect(
+			coordinator.runTrigger("online_resume"),
+		).resolves.toBeUndefined();
 
 		expect(coordinator.getResourceState("items")?.status).toBe("error");
 		expect(coordinator.getResourceState("customers")?.status).toBe("fresh");
@@ -171,7 +176,10 @@ describe("SyncCoordinator", () => {
 	});
 
 	it("defers retries during cooldown while keeping usable stale state", async () => {
-		const resource = makeResource("items", "warm", ["timer", "user_action"]);
+		const resource = makeResource("items", "warm", [
+			"timer",
+			"user_action",
+		]);
 		const runResource = vi
 			.fn()
 			.mockRejectedValueOnce(new Error("temporary failure"))
@@ -212,8 +220,15 @@ describe("SyncCoordinator", () => {
 			consecutiveFailures: 1,
 		});
 
-		await expect(coordinator.runTrigger("user_action")).resolves.toBeUndefined();
+		await expect(
+			coordinator.runTrigger("user_action"),
+		).resolves.toBeUndefined();
 		expect(runResource).toHaveBeenCalledTimes(2);
-		expect(coordinator.getResourceState("items")?.status).toBe("fresh");
+		expect(coordinator.getResourceState("items")).toMatchObject({
+			status: "fresh",
+			lastError: null,
+			consecutiveFailures: 0,
+			nextRetryAt: null,
+		});
 	});
 });

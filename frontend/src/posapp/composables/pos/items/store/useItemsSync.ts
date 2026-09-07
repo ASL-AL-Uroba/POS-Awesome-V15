@@ -3,8 +3,15 @@ import type { Item, POSProfile } from "../../../../types/models";
 import itemService from "../../../../services/itemService";
 // @ts-ignore
 import {
+	beginItemCatalogGeneration,
+	clearItemDetailsCache,
+	clearPriceListCache,
+	discardItemCatalogGeneration,
+	getActiveItemCatalogGeneration,
 	saveItemsBulk,
-	clearStoredItems,
+	stageItemCatalogRows,
+	promoteItemCatalogGeneration,
+	withItemCatalogRefreshLock,
 	setItemsLastSync,
 	getItemsLastSync,
 	saveItemDetailsCache,
@@ -28,8 +35,19 @@ const containsStockQuantities = (items: Item[]) =>
 	Array.isArray(items) && items.some(hasStockQuantity);
 
 const DELTA_SYNC_LIMIT = 1000;
-const BACKGROUND_SYNC_PAGE_SIZE = 1000;
+const BACKGROUND_SYNC_PAGE_SIZE = 200;
+const BACKGROUND_SYNC_CONCURRENCY = 5;
 const BACKGROUND_PAGINATION_REFRESH_BATCHES = 5;
+const BACKGROUND_PROGRESS_YIELD_INTERVAL = 10;
+
+const yieldToBrowser = () =>
+	new Promise<void>((resolve) => {
+		if (typeof requestAnimationFrame === "function") {
+			requestAnimationFrame(() => resolve());
+			return;
+		}
+		setTimeout(resolve, 0);
+	});
 
 export function useItemsSync() {
 	const isLoading = ref(false);
@@ -99,10 +117,29 @@ export function useItemsSync() {
 
 		try {
 			if (replaceExisting) {
-				await clearStoredItems(scope);
+				await withItemCatalogRefreshLock(scope, async () => {
+					const { generation } =
+						await beginItemCatalogGeneration(scope);
+					try {
+						const stagedCount = await stageItemCatalogRows(
+							itemsBatch,
+							scope,
+							generation,
+						);
+						await promoteItemCatalogGeneration(scope, generation, {
+							expectedCount: stagedCount,
+						});
+					} catch (error) {
+						await discardItemCatalogGeneration(
+							scope,
+							generation,
+						).catch(() => undefined);
+						throw error;
+					}
+				});
+			} else {
+				await saveItemsBulk(itemsBatch, scope);
 			}
-
-			await saveItemsBulk(itemsBatch, scope);
 			await updateCachedPaginationCallback();
 		} catch (error) {
 			console.error("Failed to persist items batch:", error);
@@ -208,7 +245,7 @@ export function useItemsSync() {
 		}
 	};
 
-	const backgroundSyncItems = async (
+	const backgroundSyncItemsUnlocked = async (
 		options: {
 			reset?: boolean;
 			groupFilter?: string;
@@ -219,6 +256,7 @@ export function useItemsSync() {
 		activePriceList: string,
 		scope: string,
 		shouldPersistItems: boolean,
+		hydrateRuntimeItems: boolean,
 		resolvePageSize: (_pageSize?: number) => number,
 		setItems: (_items: Item[], _options?: any) => void,
 		updateCachedPaginationFromStorage: () => Promise<void>,
@@ -256,124 +294,264 @@ export function useItemsSync() {
 		const bootstrapCount = Array.isArray(initialBatch)
 			? initialBatch.length
 			: items.value.length;
+		let stagedCount = 0;
+		let catalogGeneration = "";
+		let reachedCatalogEnd = false;
 		let stockCacheReady = false;
 		let batchesSincePaginationRefresh = 0;
-		const remainingCatalogEstimate =
-			totalItemCount.value > bootstrapCount
-				? totalItemCount.value - bootstrapCount
-				: 0;
+		let remainingCatalogTotal = 0;
+		const limit = resolvePageSize(BACKGROUND_SYNC_PAGE_SIZE);
+		const updateLiveProgress = (count: number) => {
+			syncedItemsCount.value = count;
+			if (remainingCatalogTotal > 0) {
+				loadProgress.value = Math.min(
+					99,
+					Math.round((count / remainingCatalogTotal) * 100),
+				);
+				return;
+			}
+			if (count > 0) {
+				loadProgress.value = Math.min(
+					99,
+					Math.round((count / (count + limit)) * 100),
+				);
+			}
+		};
+		const publishBatchProgress = async (
+			previousCount: number,
+			batchSize: number,
+		) => {
+			for (let index = 1; index <= batchSize; index += 1) {
+				if (backgroundSyncState.value.token !== token) {
+					return previousCount + index - 1;
+				}
+				const nextCount = previousCount + index;
+				updateLiveProgress(nextCount);
+				if (
+					index % BACKGROUND_PROGRESS_YIELD_INTERVAL === 0 ||
+					index === batchSize
+				) {
+					await yieldToBrowser();
+				}
+			}
+			return previousCount + batchSize;
+		};
+		const fetchPageWave = async (waveOffset: number) => {
+			const offsets = Array.from(
+				{ length: BACKGROUND_SYNC_CONCURRENCY },
+				(_, index) => waveOffset + index * limit,
+			);
+
+			return await Promise.all(
+				offsets.map(async (offset) => {
+					// Clone the profile per request because reset flags are request-specific.
+					const requestProfile = JSON.parse(
+						JSON.stringify(posProfile),
+					);
+					if (reset) {
+						requestProfile.posa_use_server_cache = 0;
+						requestProfile.posa_force_reload_items = 1;
+					}
+
+					// @ts-ignore
+					const response = await frappe.call({
+						method: "posawesome.posawesome.api.items.get_items",
+						args: {
+							pos_profile: JSON.stringify(requestProfile),
+							price_list: activePriceList,
+							item_group:
+								normalizedGroup !== "ALL"
+									? normalizedGroup.toLowerCase()
+									: "",
+							offset,
+							limit,
+						},
+						freeze: false,
+					});
+
+					return {
+						offset,
+						batch: Array.isArray(response?.message)
+							? response.message
+							: [],
+					};
+				}),
+			);
+		};
+		const fetchServerCatalogTotal = async () => {
+			try {
+				const countArgs: {
+					pos_profile: string;
+					item_groups?: string[];
+				} = {
+					pos_profile: JSON.stringify(posProfile),
+				};
+				if (normalizedGroup !== "ALL") {
+					countArgs.item_groups = [normalizedGroup];
+				}
+				const serverCatalogTotal =
+					await itemService.getItemsCountData(countArgs);
+				return Number.isFinite(serverCatalogTotal) &&
+					serverCatalogTotal > 0
+					? serverCatalogTotal
+					: 0;
+			} catch (error) {
+				console.warn(
+					"Failed to load item count for background sync:",
+					error,
+				);
+				return 0;
+			}
+		};
+		const preparePageWave = async (
+			pageResults: Array<{ offset: number; batch: Item[] }>,
+		) => {
+			let reachedEnd = false;
+			const completedBatches: Item[][] = [];
+			for (const { batch } of pageResults) {
+				if (batch.length > 0) {
+					completedBatches.push(batch);
+				}
+				reachedEnd = batch.length < limit;
+				if (reachedEnd) {
+					break;
+				}
+			}
+
+			const waveItems = completedBatches.flat();
+			if (waveItems.length > 0) {
+				stagedCount += await stageItemCatalogRows(
+					waveItems,
+					scope,
+					catalogGeneration,
+				);
+				if (containsStockQuantities(waveItems)) {
+					updateLocalStockCache(waveItems);
+					stockCacheReady = true;
+				}
+			}
+
+			return {
+				reachedEnd,
+				completedBatchCount: completedBatches.length,
+				waveItems,
+			};
+		};
 
 		try {
-			if (reset) {
-				await clearStoredItems(scope);
-				if (Array.isArray(initialBatch) && initialBatch.length) {
-					await saveItemsBulk(initialBatch, scope);
-					if (containsStockQuantities(initialBatch)) {
-						updateLocalStockCache(initialBatch);
-						stockCacheReady = true;
-					}
-					await updateCachedPaginationFromStorage();
-				}
-			} else if (Array.isArray(initialBatch) && initialBatch.length) {
+			const generationState = await beginItemCatalogGeneration(scope);
+			catalogGeneration = generationState.generation;
+			if (Array.isArray(initialBatch) && initialBatch.length) {
+				stagedCount += await stageItemCatalogRows(
+					initialBatch,
+					scope,
+					catalogGeneration,
+				);
 				if (containsStockQuantities(initialBatch)) {
 					updateLocalStockCache(initialBatch);
 					stockCacheReady = true;
 				}
 			}
 
-			let loaded = items.value.length;
+			let loaded = stagedCount;
 			let syncedCount = 0;
-			let lastItemName = items.value.length
-				? items.value[items.value.length - 1]?.item_name || null
-				: null;
+			let nextOffset = reset
+				? bootstrapCount
+				: Math.max(bootstrapCount, items.value.length);
+			const [serverCatalogTotal, firstPageResults] = await Promise.all([
+				fetchServerCatalogTotal(),
+				fetchPageWave(nextOffset),
+			]);
+			if (serverCatalogTotal > 0) {
+				totalItemCount.value = serverCatalogTotal;
+				remainingCatalogTotal = Math.max(
+					0,
+					serverCatalogTotal - nextOffset,
+				);
+			} else {
+				remainingCatalogTotal =
+					totalItemCount.value > nextOffset
+						? totalItemCount.value - nextOffset
+						: 0;
+			}
 
-			const limit = resolvePageSize(BACKGROUND_SYNC_PAGE_SIZE);
+			let pendingPreparedWave = preparePageWave(firstPageResults);
 
 			while (
 				backgroundSyncState.value.token === token &&
 				shouldPersistItems
 			) {
-				// Clone posProfile and disable caching for this specific request
-				const requestProfile = JSON.parse(JSON.stringify(posProfile));
-				if (reset) {
-					requestProfile.posa_use_server_cache = 0;
-					requestProfile.posa_force_reload_items = 1;
-				}
-
-				// @ts-ignore
-				const response = await frappe.call({
-					method: "posawesome.posawesome.api.items.get_items",
-					args: {
-						pos_profile: JSON.stringify(requestProfile),
-						price_list: activePriceList,
-						item_group:
-							normalizedGroup !== "ALL"
-								? normalizedGroup.toLowerCase()
-								: "",
-						start_after: lastItemName,
-						limit,
-					},
-				});
+				const { reachedEnd, completedBatchCount, waveItems } =
+					await pendingPreparedWave;
+				reachedCatalogEnd = reachedEnd;
 
 				if (backgroundSyncState.value.token !== token) {
 					break;
 				}
 
-				const batch = Array.isArray(response.message)
-					? response.message
-					: [];
-				if (batch.length === 0) {
+				const nextWaveOffset =
+					nextOffset + BACKGROUND_SYNC_CONCURRENCY * limit;
+				const nextPageResults = !reachedEnd
+					? fetchPageWave(nextWaveOffset)
+					: null;
+
+				if (waveItems.length > 0) {
+					if (hydrateRuntimeItems) {
+						setItems(waveItems, { append: true });
+						appended.push(...waveItems);
+					}
+					loaded = stagedCount;
+					batchesSincePaginationRefresh += completedBatchCount;
+
+					const shouldRefreshPagination =
+						reachedEnd ||
+						batchesSincePaginationRefresh >=
+							BACKGROUND_PAGINATION_REFRESH_BATCHES;
+					const paginationRefresh = shouldRefreshPagination
+						? updateCachedPaginationFromStorage()
+						: Promise.resolve();
+					const nextPreparedWave = nextPageResults
+						? nextPageResults.then(preparePageWave)
+						: null;
+					[syncedCount] = await Promise.all([
+						publishBatchProgress(syncedCount, waveItems.length),
+						paginationRefresh,
+					]);
+					if (shouldRefreshPagination) {
+						batchesSincePaginationRefresh = 0;
+					}
+					if (nextPreparedWave) {
+						pendingPreparedWave = nextPreparedWave;
+					}
+				}
+
+				if (reachedEnd || backgroundSyncState.value.token !== token) {
 					break;
 				}
 
-				primeItemDetailsCache(batch, posProfile, activePriceList);
-				if (containsStockQuantities(batch)) {
-					updateLocalStockCache(batch);
-					stockCacheReady = true;
-				}
-				await saveItemsBulk(batch, scope);
-				setItems(batch, { append: true });
-				appended.push(...batch);
-				loaded += batch.length;
-				syncedCount += batch.length;
-				syncedItemsCount.value = syncedCount;
-				lastItemName =
-					batch[batch.length - 1]?.item_name || lastItemName;
-				batchesSincePaginationRefresh += 1;
-
-				if (remainingCatalogEstimate > 0) {
-					loadProgress.value = Math.min(
-						99,
-						Math.round(
-							(syncedCount / remainingCatalogEstimate) * 100,
-						),
-					);
-				} else if (syncedCount > 0) {
-					loadProgress.value = Math.min(
-						99,
-						Math.round((syncedCount / (syncedCount + limit)) * 100),
-					);
-				}
-
-				const reachedEnd = batch.length < limit;
-				if (
-					reachedEnd ||
-					batchesSincePaginationRefresh >=
-						BACKGROUND_PAGINATION_REFRESH_BATCHES
-				) {
-					await updateCachedPaginationFromStorage();
-					batchesSincePaginationRefresh = 0;
-				}
-
-				if (batch.length < limit) {
-					break;
-				}
+				nextOffset = nextWaveOffset;
 			}
 
-			if (backgroundSyncState.value.token === token) {
+			if (
+				backgroundSyncState.value.token === token &&
+				reachedCatalogEnd
+			) {
+				const promoted = await promoteItemCatalogGeneration(
+					scope,
+					catalogGeneration,
+					{
+						expectedCount:
+							serverCatalogTotal > 0
+								? serverCatalogTotal
+								: stagedCount,
+					},
+				);
+				loaded = promoted.rowCount;
+				clearPriceListCache();
+				clearItemDetailsCache();
+				await updateCachedPaginationFromStorage();
 				loadProgress.value = 100;
 				itemsLoaded.value = true;
-				await updateCachedPaginationFromStorage();
 				setItemsLastSync(new Date().toISOString());
 				if (stockCacheReady) {
 					setStockCacheReady(true);
@@ -387,9 +565,22 @@ export function useItemsSync() {
 				refreshBootstrapSnapshotFromCacheState(snapshotState);
 			}
 
+			if (
+				backgroundSyncState.value.token !== token ||
+				!reachedCatalogEnd
+			) {
+				await discardItemCatalogGeneration(scope, catalogGeneration);
+			}
+
 			return appended;
 		} catch (error) {
 			console.error("Background item sync failed:", error);
+			if (catalogGeneration) {
+				await discardItemCatalogGeneration(
+					scope,
+					catalogGeneration,
+				).catch(() => undefined);
+			}
 			return appended;
 		} finally {
 			if (backgroundSyncState.value.token === token) {
@@ -397,6 +588,20 @@ export function useItemsSync() {
 				isBackgroundLoading.value = false;
 			}
 		}
+	};
+
+	const backgroundSyncItems = async (
+		...args: Parameters<typeof backgroundSyncItemsUnlocked>
+	) => {
+		const scope = args[3];
+		const activeBefore = await getActiveItemCatalogGeneration(scope);
+		return await withItemCatalogRefreshLock(scope, async () => {
+			const activeAfterWait = await getActiveItemCatalogGeneration(scope);
+			if (activeAfterWait && activeAfterWait !== activeBefore) {
+				return [];
+			}
+			return await backgroundSyncItemsUnlocked(...args);
+		});
 	};
 
 	return {
