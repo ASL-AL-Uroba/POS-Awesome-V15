@@ -20,13 +20,21 @@ const stubPrintPopup = () => {
 	return () => written;
 };
 
-const ITEM = { item_code: "ITEM-1", item_name: "Item One", barcode: "1234567890128", qty: 4 };
+const ITEM = {
+	item_code: "ITEM-1",
+	item_name: "Item One",
+	barcode: "1234567890128",
+	qty: 4,
+};
 
 describe("useBarcodePrintOutput printLabels page sizing", () => {
 	beforeEach(() => {
 		setActivePinia(createPinia());
 		vi.stubGlobal("__", (value: string) => value);
-		vi.stubGlobal("frappe", { call: vi.fn(), session: { user: "test@example.com" } });
+		vi.stubGlobal("frappe", {
+			call: vi.fn(),
+			session: { user: "test@example.com" },
+		});
 	});
 
 	it("routes a label format through html2pdf so jsPDF sets the real page box", () => {
@@ -43,7 +51,9 @@ describe("useBarcodePrintOutput printLabels page sizing", () => {
 		expect(html).toContain("autoPrint()");
 		expect(html).not.toContain("window.print()");
 
-		const opt = JSON.parse(/html2pdf\(\)\.set\((\{.*?\})\)\.from/s.exec(html)![1]);
+		const opt = JSON.parse(
+			/html2pdf\(\)\.set\((\{.*?\})\)\.from/s.exec(html)![1],
+		);
 		expect(opt.jsPDF.format).toEqual([58, 40]);
 		// 58 >= 40, and jsPDF would silently swap to portrait unless told otherwise.
 		expect(opt.jsPDF.orientation).toBe("landscape");
@@ -60,7 +70,9 @@ describe("useBarcodePrintOutput printLabels page sizing", () => {
 		out.encodeQtyInBarcode.value = true;
 
 		out.printLabels([ITEM]); // qty 4 collapses to a single {barcode}*4 label
-		const opt = JSON.parse(/html2pdf\(\)\.set\((\{.*?\})\)\.from/s.exec(read())![1]);
+		const opt = JSON.parse(
+			/html2pdf\(\)\.set\((\{.*?\})\)\.from/s.exec(read())![1],
+		);
 
 		expect(opt.html2canvas.height).toBe(Math.floor(1 * 40 * (96 / 25.4)));
 	});
@@ -83,7 +95,9 @@ describe("useBarcodePrintOutput printLabels page sizing", () => {
 		out.pageFormat.value = "100x150mm";
 
 		out.printLabels([ITEM]);
-		const opt = JSON.parse(/html2pdf\(\)\.set\((\{.*?\})\)\.from/s.exec(read())![1]);
+		const opt = JSON.parse(
+			/html2pdf\(\)\.set\((\{.*?\})\)\.from/s.exec(read())![1],
+		);
 
 		expect(opt.jsPDF.format).toEqual([100, 150]);
 		expect(opt.jsPDF.orientation).toBe("portrait");
@@ -99,7 +113,11 @@ describe("useBarcodePrintOutput printLabels page sizing", () => {
 			out.pageFormat.value = value;
 			const size = out.parseLabelSize();
 			// An unknown preset silently falls back to A4, so this guards the sizes existing.
-			expect([size.type, size.width, size.height]).toEqual(["thermal", dims[0], dims[1]]);
+			expect([size.type, size.width, size.height]).toEqual([
+				"thermal",
+				dims[0],
+				dims[1],
+			]);
 		}
 	});
 });

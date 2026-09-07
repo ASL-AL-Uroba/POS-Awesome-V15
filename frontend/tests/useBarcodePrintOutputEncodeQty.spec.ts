@@ -5,15 +5,20 @@ import { useBarcodePrintOutput } from "../src/posapp/composables/pos/items/useBa
 
 // Extracts every jsbarcode-value / jsbarcode-format pair from generated label HTML.
 const readBarcodes = (html: string) =>
-	Array.from(html.matchAll(/jsbarcode-format="([^"]*)"\s+jsbarcode-value="([^"]*)"/g)).map(
-		([, format, value]) => ({ format, value }),
-	);
+	Array.from(
+		html.matchAll(
+			/jsbarcode-format="([^"]*)"\s+jsbarcode-value="([^"]*)"/g,
+		),
+	).map(([, format, value]) => ({ format, value }));
 
 describe("useBarcodePrintOutput quantity-embedded barcodes", () => {
 	beforeEach(() => {
 		setActivePinia(createPinia());
 		vi.stubGlobal("__", (value: string) => value);
-		vi.stubGlobal("frappe", { call: vi.fn(), session: { user: "test@example.com" } });
+		vi.stubGlobal("frappe", {
+			call: vi.fn(),
+			session: { user: "test@example.com" },
+		});
 	});
 
 	it("prints one CODE128 label carrying {barcode}*{qty} when encoding is enabled", () => {
@@ -23,7 +28,12 @@ describe("useBarcodePrintOutput quantity-embedded barcodes", () => {
 
 		// 13 digits => guessSymbologyFromBarcode() would pick EAN13, which cannot encode "*".
 		const html = out.generatePrintContent([
-			{ item_code: "ITEM-1", item_name: "Item One", barcode: "1234567890128", qty: 5 },
+			{
+				item_code: "ITEM-1",
+				item_name: "Item One",
+				barcode: "1234567890128",
+				qty: 5,
+			},
 		]);
 
 		const barcodes = readBarcodes(html);
@@ -39,7 +49,12 @@ describe("useBarcodePrintOutput quantity-embedded barcodes", () => {
 		out.pageFormat.value = "58x40mm";
 
 		const html = out.generatePrintContent([
-			{ item_code: "ITEM-1", item_name: "Item One", barcode: "1234567890128", qty: 3 },
+			{
+				item_code: "ITEM-1",
+				item_name: "Item One",
+				barcode: "1234567890128",
+				qty: 3,
+			},
 		]);
 
 		const barcodes = readBarcodes(html);
@@ -54,7 +69,12 @@ describe("useBarcodePrintOutput quantity-embedded barcodes", () => {
 		out.pageFormat.value = "58x40mm";
 
 		const html = out.generatePrintContent([
-			{ item_code: "ITEM-1", item_name: "Item One", barcode: "1234567890128", qty: 1 },
+			{
+				item_code: "ITEM-1",
+				item_name: "Item One",
+				barcode: "1234567890128",
+				qty: 1,
+			},
 		]);
 
 		const barcodes = readBarcodes(html);
@@ -66,14 +86,20 @@ describe("useBarcodePrintOutput quantity-embedded barcodes", () => {
 	it("sizes the barcode from the encoded value, not the raw barcode", () => {
 		const out = useBarcodePrintOutput();
 		out.pageFormat.value = "58x40mm";
-		const item = { item_code: "ITEM-1", item_name: "Item One", barcode: "1234567890128", qty: 12 };
+		const item = {
+			item_code: "ITEM-1",
+			item_name: "Item One",
+			barcode: "1234567890128",
+			qty: 12,
+		};
 
 		out.encodeQtyInBarcode.value = true;
 		const encoded = out.generatePrintContent([item]);
 		out.encodeQtyInBarcode.value = false;
 		const plain = out.generatePrintContent([item]);
 
-		const widthOf = (html: string) => Number(/jsbarcode-width="([^"]*)"/.exec(html)?.[1]);
+		const widthOf = (html: string) =>
+			Number(/jsbarcode-width="([^"]*)"/.exec(html)?.[1]);
 		// "1234567890128*12" is longer than "1234567890128", so the module width must shrink
 		// to keep the symbol inside the label.
 		expect(widthOf(encoded)).toBeLessThanOrEqual(widthOf(plain));
