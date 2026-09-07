@@ -38,8 +38,12 @@ jobs:
   docs-generate:
     name: Generate & commit API reference
     runs-on: ubuntu-22.04
-    # Only commit generated docs from protected integration branches.
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
+    # Only commit generated docs from develop, the integration branch.
+    # Deliberately excludes main: TypeDoc stamps the generating commit's SHA into every
+    # source link, so a branch that regenerates independently rewrites all of
+    # frontend/docs/api and collides with develop on the next release PR. main is a
+    # release/deploy branch and inherits develop's generated docs through that merge.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     needs: docs-check
     permissions:
       contents: write
