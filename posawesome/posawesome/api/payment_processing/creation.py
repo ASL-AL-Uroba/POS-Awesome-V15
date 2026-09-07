@@ -5,12 +5,18 @@ from frappe.utils import nowdate, flt
 from erpnext.accounts.party import get_party_account
 from erpnext.accounts.utils import get_account_currency
 from erpnext.setup.utils import get_exchange_rate
-from erpnext.accounts.doctype.bank_account.bank_account import get_party_bank_account
+from posawesome.posawesome.api.erpnext_compat import resolve_get_party_bank_account
 from posawesome.posawesome.api.idempotency import doctype_supports_client_request_id
 from posawesome.posawesome.api.payment_processing.utils import (
     get_bank_cash_account,
     set_paid_amount_and_received_amount
 )
+
+
+def get_party_bank_account(*args, **kwargs):
+    """Call the ERPNext-version-specific bank-account helper lazily."""
+    return resolve_get_party_bank_account()(*args, **kwargs)
+
 
 def create_payment_entry(
     company,
@@ -29,6 +35,10 @@ def create_payment_entry(
     submit=0,
     client_request_id=None,
     bank_account=None,
+    payment_currency=None,
+    exchange_rate_source=None,
+    allow_manual_rate=False,
+    invoice_currency=None,
 ):
     date = nowdate() if not posting_date else posting_date
     party = party or customer
@@ -51,13 +61,93 @@ def create_payment_entry(
     if not bank:
         frappe.throw(_("Bank/Cash account not found for mode of payment {0}").format(mode_of_payment))
 
-    # Get exchange rate using the MOP bank account currency
-    if exchange_rate and flt(exchange_rate) > 0:
-        conversion_rate = flt(exchange_rate)
+    payment_currency = payment_currency or bank.account_currency
+    invoice_currency = invoice_currency or currency or party_account_currency
+
+    manual_rate_active = bool(
+        allow_manual_rate
+        and exchange_rate_source == "manual"
+        and exchange_rate
+        and flt(exchange_rate) > 0
+    )
+
+    account_to_company_rate = (
+        1
+        if bank.account_currency == company_currency
+        else flt(
+            get_exchange_rate(
+                bank.account_currency,
+                company_currency,
+                date,
+                "for_buying" if payment_type == "Pay" else "for_selling",
+            )
+        )
+    )
+    if account_to_company_rate <= 0:
+        frappe.throw(
+            _("No exchange rate is available for {0} to {1} on {2}.").format(
+                bank.account_currency, company_currency, date
+            )
+        )
+
+    if payment_currency == company_currency:
+        payment_to_company_rate = 1
+    elif manual_rate_active:
+        payment_to_company_rate = flt(exchange_rate)
     else:
-        conversion_rate = get_exchange_rate(
-            bank.account_currency, company_currency, date,
-            "for_buying" if payment_type == "Pay" else "for_selling"
+        payment_to_company_rate = flt(
+            get_exchange_rate(payment_currency, company_currency, date)
+        )
+    if payment_to_company_rate <= 0:
+        frappe.throw(
+            _("No exchange rate is available for {0} to {1} on {2}.").format(
+                payment_currency, company_currency, date
+            )
+        )
+
+    if payment_currency == invoice_currency:
+        payment_to_invoice_rate = 1
+    elif manual_rate_active:
+        invoice_to_company_rate = (
+            1
+            if invoice_currency == company_currency
+            else flt(get_exchange_rate(invoice_currency, company_currency, date))
+        )
+        if invoice_to_company_rate <= 0:
+            frappe.throw(
+                _("No exchange rate is available for {0} to {1} on {2}.").format(
+                    invoice_currency, company_currency, date
+                )
+            )
+        payment_to_invoice_rate = flt(
+            payment_to_company_rate / invoice_to_company_rate
+        )
+    else:
+        payment_to_invoice_rate = flt(
+            get_exchange_rate(payment_currency, invoice_currency, date)
+        )
+        if payment_to_invoice_rate <= 0:
+            frappe.throw(
+                _("No exchange rate is available for {0} to {1} on {2}.").format(
+                    payment_currency, invoice_currency, date
+                )
+            )
+
+    if payment_currency == bank.account_currency:
+        payment_to_account_rate = 1
+    elif manual_rate_active:
+        payment_to_account_rate = flt(
+            payment_to_company_rate / account_to_company_rate
+        )
+    else:
+        payment_to_account_rate = flt(
+            get_exchange_rate(payment_currency, bank.account_currency, date)
+        )
+    if payment_to_account_rate <= 0:
+        frappe.throw(
+            _("No exchange rate is available for {0} to {1} on {2}.").format(
+                payment_currency, bank.account_currency, date
+            )
         )
 
     # Create payment entry with metadata only
@@ -94,11 +184,12 @@ def create_payment_entry(
     pe.set_missing_values()
 
     # NOW override with our multi-currency calculations
-    bank_amount = flt(amount)
     precision = flt(frappe.db.get_default("currency_precision") or 2)
+    original_amount = flt(amount)
+    bank_amount = flt(original_amount * payment_to_account_rate, precision)
 
     if party_account_currency != bank.account_currency:
-        bank_to_base = conversion_rate
+        bank_to_base = account_to_company_rate
         party_to_base = flt(get_exchange_rate(party_account_currency, company_currency, date))
 
         if payment_type == "Receive":
@@ -116,14 +207,44 @@ def create_payment_entry(
         pe.base_received_amount = flt(pe.received_amount * pe.target_exchange_rate, precision)
     else:
         paid_amount, received_amount = set_paid_amount_and_received_amount(
-            party_account_currency, bank, amount, payment_type, None, conversion_rate
+            party_account_currency,
+            bank,
+            bank_amount,
+            payment_type,
+            None,
+            account_to_company_rate,
         )
         pe.paid_amount = paid_amount
         pe.received_amount = received_amount
-        pe.source_exchange_rate = conversion_rate
-        pe.target_exchange_rate = conversion_rate
-        pe.base_paid_amount = flt(paid_amount * conversion_rate, precision)
-        pe.base_received_amount = flt(received_amount * conversion_rate, precision)
+        pe.source_exchange_rate = account_to_company_rate
+        pe.target_exchange_rate = account_to_company_rate
+        pe.base_paid_amount = flt(
+            paid_amount * account_to_company_rate, precision
+        )
+        pe.base_received_amount = flt(
+            received_amount * account_to_company_rate, precision
+        )
+
+    metadata = {
+        "posa_payment_currency": payment_currency,
+        "posa_original_amount": original_amount,
+        "posa_invoice_currency": invoice_currency,
+        "posa_exchange_rate": payment_to_invoice_rate,
+        "posa_company_exchange_rate": payment_to_company_rate,
+        "posa_rate_date": date,
+        "posa_rate_source": (
+            "manual"
+            if manual_rate_active
+            else "same_currency"
+            if payment_currency == company_currency
+            else "currency_exchange"
+        ),
+        "posa_account_currency": bank.account_currency,
+        "posa_account_amount": bank_amount,
+    }
+    for fieldname, value in metadata.items():
+        if pe.meta.has_field(fieldname):
+            pe.set(fieldname, value)
 
     if submit:
         pe.insert(ignore_permissions=True)

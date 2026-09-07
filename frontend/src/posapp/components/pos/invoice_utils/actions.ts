@@ -3,6 +3,7 @@ import { get_invoice_doc, get_invoice_items, get_payments } from "./document";
 import { _logPriceListDebug, _buildPriceListSnapshot } from "./currency";
 import { applyReturnDiscountProration } from "./item_updates";
 import { prepareDocumentFlowAction } from "../../../utils/documentSources";
+import { shouldFocusCartQtyAfterItemAdd } from "../../../utils/cartFocusSettings";
 
 declare const __: (_text: string, _args?: any[]) => string;
 declare const frappe: any;
@@ -84,6 +85,22 @@ export async function add_item(context: any, item: any, options: any = {}) {
 		context.schedulePricingRuleApplication();
 	}
 	applyReturnDiscountProration(context);
+
+	if (
+		res &&
+		shouldFocusCartQtyAfterItemAdd(context.pos_profile) &&
+		context.eventBus &&
+		typeof context.eventBus.emit === "function"
+	) {
+		const focusedLine: any = res;
+		window.setTimeout(() => {
+			context.eventBus.emit("focus_cart_item_qty", {
+				item: focusedLine,
+				rowId: focusedLine?.posa_row_id,
+				itemCode: focusedLine?.item_code || item?.item_code,
+			});
+		}, 0);
+	}
 
 	// Log debug info
 	_logPriceListDebug(context, "add_item", {

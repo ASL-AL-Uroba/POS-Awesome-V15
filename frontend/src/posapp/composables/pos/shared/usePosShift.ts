@@ -3,7 +3,7 @@ import { useToastStore } from "../../../stores/toastStore.js";
 import { useUIStore } from "../../../stores/uiStore.js";
 import { useInvoiceStore } from "../../../stores/invoiceStore";
 import {
-	initPromise,
+	startupInitPromise,
 	checkDbHealth,
 	getOpeningStorage,
 	setOpeningStorage,
@@ -15,6 +15,10 @@ import {
 } from "../../../../offline/index";
 import { getValidCachedOpeningForCurrentUser } from "../../../utils/openingCache";
 import { createBootstrapSnapshotFromRegisterData } from "../../../../offline/bootstrapSnapshot";
+import {
+	finishStartupPhase,
+	startStartupPhase,
+} from "../../../../utils/startupTrace";
 
 declare const __BUILD_VERSION__: string;
 declare const frappe: any;
@@ -30,21 +34,22 @@ type ClosingShiftPreparationResponse = {
 	skipped_printed_invoices?: SkippedPrintedInvoice[];
 };
 
-const translateMessage = (value: string) => (typeof window !== "undefined" && window.__
-	? window.__(value)
-	: value);
+const translateMessage = (value: string) =>
+	typeof window !== "undefined" && window.__ ? window.__(value) : value;
 
 export function buildSkippedClosingInvoicesPrompt(
 	skippedInvoices: SkippedPrintedInvoice[],
 ) {
 	const count = skippedInvoices.length;
-	const baseMessage = count === 1
-		? "1 printed return invoice references a cancelled invoice and will be excluded from closing."
-		: `${count} printed return invoices reference cancelled invoices and will be excluded from closing.`;
+	const baseMessage =
+		count === 1
+			? "1 printed return invoice references a cancelled invoice and will be excluded from closing."
+			: `${count} printed return invoices reference cancelled invoices and will be excluded from closing.`;
 	const details = skippedInvoices
 		.slice(0, 5)
 		.map((invoice) => {
-			const invoiceName = invoice?.invoice || translateMessage("Unknown invoice");
+			const invoiceName =
+				invoice?.invoice || translateMessage("Unknown invoice");
 			const returnAgainst = invoice?.return_against;
 			return returnAgainst
 				? `${invoiceName} (${translateMessage("Return Against")}: ${returnAgainst})`
@@ -112,7 +117,8 @@ export function usePosShift(openDialog?: () => void) {
 	}
 
 	async function check_opening_entry() {
-		await initPromise;
+		const phase = startStartupPhase("pos_profile_and_settings_loading");
+		await startupInitPromise;
 		await checkDbHealth();
 		const cachedOpening = getValidCachedOpeningForCurrentUser(
 			getOpeningStorage(),
@@ -147,6 +153,10 @@ export function usePosShift(openDialog?: () => void) {
 						});
 					}
 					console.info("LoadPosProfile");
+					finishStartupPhase(phase, "ok", {
+						profile: pos_profile.value?.name || null,
+						source: "server",
+					});
 					try {
 						setOpeningStorage(r.message);
 					} catch (e) {
@@ -156,11 +166,16 @@ export function usePosShift(openDialog?: () => void) {
 					console.info("No opening shift found, opening dialog");
 					clearOpeningStorage();
 					openDialog && openDialog();
+					finishStartupPhase(phase, "ok", {
+						profile: null,
+						source: "server_no_opening",
+					});
 				}
 			})
 			.catch((err: unknown) => {
 				console.error("Error checking opening entry", err);
-				const data = cachedOpening ||
+				const data =
+					cachedOpening ||
 					getValidCachedOpeningForCurrentUser(
 						getOpeningStorage(),
 						frappe?.session?.user,
@@ -168,12 +183,17 @@ export function usePosShift(openDialog?: () => void) {
 				if (data) {
 					applyRegisterData(data);
 					console.info("LoadPosProfile (cached)");
+					finishStartupPhase(phase, "ok", {
+						profile: pos_profile.value?.name || null,
+						source: "cache_fallback",
+					});
 					return;
 				}
 				if (!isOffline()) {
 					clearOpeningStorage();
 				}
 				openDialog && openDialog();
+				finishStartupPhase(phase, "error", { error: err });
 			});
 	}
 
@@ -195,9 +215,13 @@ export function usePosShift(openDialog?: () => void) {
 			)
 			.then((r: any) => {
 				if (r.message) {
-					const response = normalizeClosingShiftPreparationResponse(r.message);
+					const response = normalizeClosingShiftPreparationResponse(
+						r.message,
+					);
 					const closingShift = response.closing_shift;
-					const skippedPrintedInvoices = Array.isArray(response.skipped_printed_invoices)
+					const skippedPrintedInvoices = Array.isArray(
+						response.skipped_printed_invoices,
+					)
 						? response.skipped_printed_invoices
 						: [];
 					if (!closingShift) {
@@ -206,7 +230,9 @@ export function usePosShift(openDialog?: () => void) {
 
 					if (skippedPrintedInvoices.length) {
 						const confirmed = window.confirm(
-							buildSkippedClosingInvoicesPrompt(skippedPrintedInvoices),
+							buildSkippedClosingInvoicesPrompt(
+								skippedPrintedInvoices,
+							),
 						);
 						if (!confirmed) {
 							return;

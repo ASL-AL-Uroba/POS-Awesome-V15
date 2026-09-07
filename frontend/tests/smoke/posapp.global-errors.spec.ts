@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const POS_PATH = process.env.POSA_SMOKE_PATH || "/app/posapp";
+const POS_PATH = process.env.POSA_SMOKE_PATH || "/desk/posapp";
 const HAS_CONFIGURED_SMOKE_TARGET = Boolean(process.env.POSA_SMOKE_BASE_URL);
 
 test.skip(
@@ -72,7 +72,9 @@ test("POS app smoke route has no uncaught global errors", async ({ page }) => {
 	await loginIfCredentialsProvided(page);
 	await page.goto(POS_PATH, { waitUntil: "domcontentloaded" });
 
-	await expect(page).toHaveURL(new RegExp("/app/(posapp|point-of-sale)"));
+	await expect(page).toHaveURL(
+		new RegExp("/(?:app|desk)/(?:posapp|point-of-sale)"),
+	);
 	await expect(page.locator(".main-section").first()).toBeVisible();
 
 	await page.waitForTimeout(5000);

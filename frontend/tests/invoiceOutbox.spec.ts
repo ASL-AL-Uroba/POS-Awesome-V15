@@ -11,6 +11,8 @@ import {
 	getPendingOfflineInvoiceCount,
 	initPromise,
 	memory,
+	persistInvoiceIntentJournal,
+	removeInvoiceOutboxEntry,
 	saveOfflineInvoice,
 	setInvoiceOutboxMode,
 } from "../src/offline/index";
@@ -107,6 +109,7 @@ describe("invoice outbox sync resource", () => {
 
 		expect(callOfflineSyncMethod).toHaveBeenCalledTimes(1);
 		expect(await getPendingInvoiceOutboxCount()).toBe(0);
+		expect(getPendingOfflineInvoiceCount()).toBe(0);
 		expect(await getInvoiceOutboxRows({ includeTerminal: true })).toEqual([
 			expect.objectContaining({
 				status: "acknowledged",
@@ -199,5 +202,36 @@ describe("invoice outbox sync resource", () => {
 				storageKey: "invoice_outbox",
 			}),
 		);
+	});
+
+	it("removes an acknowledged online intent by canonical request ID", async () => {
+		persistInvoiceIntentJournal({
+			invoice: { posa_client_request_id: "online-intent-001" },
+			data: { client_request_id: "online-intent-001" },
+		});
+		expect(
+			localStorage.getItem("posa_invoice_intent_online-intent-001"),
+		).toBeTruthy();
+		await db.table("invoice_outbox").add({
+			client_request_id: "online-intent-001",
+			status: "pending",
+			invoice: { posa_client_request_id: "online-intent-001" },
+			data: { idempotency_key: "online-intent-001" },
+			created_at: new Date().toISOString(),
+			updated_at: new Date().toISOString(),
+			next_retry_at: null,
+			retry_count: 0,
+			last_error: null,
+			invoice_name: null,
+			acknowledged_at: null,
+		});
+
+		await expect(
+			removeInvoiceOutboxEntry("online-intent-001"),
+		).resolves.toBe(1);
+		expect(await getPendingInvoiceOutboxCount()).toBe(0);
+		expect(
+			localStorage.getItem("posa_invoice_intent_online-intent-001"),
+		).toBeNull();
 	});
 });

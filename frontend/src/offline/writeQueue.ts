@@ -1,4 +1,4 @@
-import { checkDbHealth, db, initPromise, memory } from "./db";
+import { checkDbHealth, db, memory, startupInitPromise } from "./db";
 import {
 	ensureOfflineInvoiceRequest,
 	ensurePaymentClientRequestId,
@@ -81,7 +81,10 @@ function stableStringify(value: any): string {
 	if (value && typeof value === "object") {
 		return `{${Object.keys(value)
 			.sort()
-			.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+			.map(
+				(key) =>
+					`${JSON.stringify(key)}:${stableStringify(value[key])}`,
+			)
 			.join(",")}}`;
 	}
 
@@ -185,7 +188,9 @@ function deriveIdempotencyKey(
 	payload: AnyRecord,
 ): string {
 	if (entityType === "invoice") {
-		const requestId = String(payload?.invoice?.posa_client_request_id || "").trim();
+		const requestId = String(
+			payload?.invoice?.posa_client_request_id || "",
+		).trim();
 		if (requestId) {
 			return `invoice:${requestId}`;
 		}
@@ -235,8 +240,14 @@ function deriveIdempotencyKey(
 	return `${entityType}:${hashString(stableStringify(payload))}`;
 }
 
-function isCustomerUpdateKey(entityType: OfflineEntityType, idempotencyKey: string) {
-	return entityType === "customer" && idempotencyKey.startsWith("customer:update:");
+function isCustomerUpdateKey(
+	entityType: OfflineEntityType,
+	idempotencyKey: string,
+) {
+	return (
+		entityType === "customer" &&
+		idempotencyKey.startsWith("customer:update:")
+	);
 }
 
 function buildCoalescedQueueEntry(
@@ -282,7 +293,7 @@ async function clearLegacyQueueStorage(memoryKey: string) {
 }
 
 async function ensureQueueDbReady() {
-	await initPromise;
+	await startupInitPromise;
 	await checkDbHealth();
 	if (!db.isOpen()) {
 		await db.open();
@@ -335,7 +346,8 @@ async function enqueueWriteQueueEntryInternal(
 ) {
 	const normalizedPayload = normalizePayload(entityType, payload);
 	const idempotencyKey =
-		options.idempotencyKey || deriveIdempotencyKey(entityType, normalizedPayload);
+		options.idempotencyKey ||
+		deriveIdempotencyKey(entityType, normalizedPayload);
 
 	const table = db.table(WRITE_QUEUE_TABLE);
 	const queuedEntry = await db.transaction("rw", table, async () => {
@@ -417,7 +429,9 @@ export async function clearWriteQueueEntries(
 	});
 	const queueIds = entries
 		.map((entry) => entry.queue_id)
-		.filter((queueId): queueId is number => Number.isFinite(Number(queueId)));
+		.filter((queueId): queueId is number =>
+			Number.isFinite(Number(queueId)),
+		);
 
 	if (queueIds.length) {
 		await db.table(WRITE_QUEUE_TABLE).bulkDelete(queueIds);
@@ -426,7 +440,9 @@ export async function clearWriteQueueEntries(
 	await refreshQueueMemory(entityType);
 }
 
-export async function claimRetryableQueueEntries(entityType: OfflineEntityType) {
+export async function claimRetryableQueueEntries(
+	entityType: OfflineEntityType,
+) {
 	await ensureOfflineQueueReady();
 
 	const table = db.table(WRITE_QUEUE_TABLE);
@@ -476,7 +492,9 @@ async function updateClaimedQueueEntry(
 ) {
 	const table = db.table(WRITE_QUEUE_TABLE);
 	const updated = await db.transaction("rw", table, async () => {
-		const current = (await table.get(queueId)) as OfflineQueueEntry | undefined;
+		const current = (await table.get(queueId)) as
+			| OfflineQueueEntry
+			| undefined;
 		if (!current) {
 			return false;
 		}
@@ -515,10 +533,52 @@ export async function markWriteQueueEntrySynced(
 			...current,
 			status: "synced",
 			last_error: null,
-			last_attempt_at: current.last_attempt_at || expectedLastAttemptAt || nowIso(),
+			last_attempt_at:
+				current.last_attempt_at || expectedLastAttemptAt || nowIso(),
 			next_attempt_at: null,
 		}),
 	);
+}
+
+export async function markWriteQueueEntrySyncedByIdempotencyKey(
+	entityType: OfflineEntityType,
+	idempotencyKey: string,
+) {
+	await ensureOfflineQueueReady();
+	const normalizedKey = String(idempotencyKey || "").trim();
+	if (!normalizedKey) {
+		return false;
+	}
+
+	const table = db.table(WRITE_QUEUE_TABLE);
+	const updated = await db.transaction("rw", table, async () => {
+		const current = (await table
+			.where("idempotency_key")
+			.equals(normalizedKey)
+			.first()) as OfflineQueueEntry | undefined;
+		if (
+			!current ||
+			current.entity_type !== entityType ||
+			!isActiveStatus(current.status)
+		) {
+			return false;
+		}
+
+		await table.put({
+			...current,
+			status: "synced",
+			last_error: null,
+			last_attempt_at: current.last_attempt_at || nowIso(),
+			next_attempt_at: null,
+		});
+		return true;
+	});
+
+	if (updated) {
+		await refreshQueueMemory(entityType);
+	}
+
+	return updated;
 }
 
 export async function markWriteQueueEntryFailed(
@@ -567,7 +627,10 @@ export async function updateQueuedPayloads(
 			if (!isActiveStatus(entry.status)) {
 				continue;
 			}
-			const nextPayload = normalizePayload(entityType, updater(cloneSerializable(entry.payload)));
+			const nextPayload = normalizePayload(
+				entityType,
+				updater(cloneSerializable(entry.payload)),
+			);
 			await table.put({
 				...entry,
 				payload: nextPayload,
@@ -588,7 +651,10 @@ export async function migrateLegacyOfflineQueues() {
 
 		if (legacyEntries.length) {
 			for (const legacyEntry of legacyEntries) {
-				await enqueueWriteQueueEntryInternal(config.entityType, legacyEntry);
+				await enqueueWriteQueueEntryInternal(
+					config.entityType,
+					legacyEntry,
+				);
 			}
 		}
 

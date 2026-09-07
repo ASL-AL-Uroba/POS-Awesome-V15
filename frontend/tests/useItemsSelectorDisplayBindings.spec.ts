@@ -6,13 +6,17 @@ import { useItemsSelectorDisplayBindings } from "../src/posapp/composables/pos/i
 describe("useItemsSelectorDisplayBindings", () => {
 	it("proxies item display bindings without freezing reactive values", () => {
 		const headers = ref([{ title: "Code", key: "item_code" }]);
-		const currencyFormatter = vi.fn((value: unknown) => `currency:${value}`);
+		const currencyFormatter = vi.fn(
+			(value: unknown) => `currency:${value}`,
+		);
 		const numberFormatter = vi.fn((value: unknown) => `number:${value}`);
 		const itemDisplay = {
 			headers,
 			memoizedFormatCurrency: ref(currencyFormatter),
 			memoizedFormatNumber: ref(numberFormatter),
-			ratePrecision: vi.fn((value: string | number) => (Number(value) % 1 === 0 ? 0 : 2)),
+			ratePrecision: vi.fn((value: string | number) =>
+				Number(value) % 1 === 0 ? 0 : 2,
+			),
 			format_currency: vi.fn(),
 			format_number: vi.fn(),
 			currencySymbol: vi.fn(),
@@ -29,8 +33,12 @@ describe("useItemsSelectorDisplayBindings", () => {
 			itemSelection,
 		});
 
-		expect(bindings.headers.value).toEqual([{ title: "Code", key: "item_code" }]);
-		expect(bindings.memoizedFormatCurrency.value(5, "USD")).toBe("currency:5");
+		expect(bindings.headers.value).toEqual([
+			{ title: "Code", key: "item_code" },
+		]);
+		expect(bindings.memoizedFormatCurrency.value(5, "USD")).toBe(
+			"currency:5",
+		);
 		expect(bindings.memoizedFormatNumber.value(7)).toBe("number:7");
 		expect(bindings.ratePrecision).toBe(itemDisplay.ratePrecision);
 		expect(bindings.format_currency).toBe(itemDisplay.format_currency);
@@ -38,7 +46,9 @@ describe("useItemsSelectorDisplayBindings", () => {
 		expect(bindings.currencySymbol).toBe(itemDisplay.currencySymbol);
 
 		headers.value = [{ title: "Name", key: "item_name" }];
-		expect(bindings.headers.value).toEqual([{ title: "Name", key: "item_name" }]);
+		expect(bindings.headers.value).toEqual([
+			{ title: "Name", key: "item_name" },
+		]);
 	});
 
 	it("provides table header props and item row/highlight wrappers", () => {
@@ -47,7 +57,10 @@ describe("useItemsSelectorDisplayBindings", () => {
 			highlightedIndex: ref(2),
 			isItemHighlighted: vi.fn((candidate) => candidate === item),
 			getItemRowClass: vi.fn(() => "item-row-highlighted"),
-			getItemRowProps: vi.fn(() => ({ class: "item-row-highlighted" })),
+			getItemRowProps: vi.fn(() => ({
+				"aria-selected": "true",
+				class: { "item-row-highlighted": true },
+			})),
 		};
 
 		const bindings = useItemsSelectorDisplayBindings({
@@ -74,9 +87,14 @@ describe("useItemsSelectorDisplayBindings", () => {
 		expect(bindings.isNegative(0)).toBe(false);
 		expect(bindings.getItemRowClass(item)).toBe("item-row-highlighted");
 		expect(bindings.getItemRowProps(item)).toEqual({
-			class: "item-row-highlighted",
+			"aria-selected": "true",
+			class: { "item-row-highlighted": true },
 			"data-item-code": "ITEM-001",
+			"data-pos-keyboard-target": "item-row",
+			"data-testid": "pos-item-row-ITEM-001",
 			draggable: true,
+			role: "button",
+			tabindex: 0,
 		});
 	});
 });

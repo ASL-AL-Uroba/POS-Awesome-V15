@@ -4,6 +4,7 @@
 		:height="isMobile ? 64 : 56"
 		:class="[
 			'pos-navbar-enhanced elevation-2 pos-themed-card pos-theme-immediate',
+			{ 'pos-navbar-enhanced--counter-grid': isCounterGrid },
 			rtlClasses,
 			isRtl ? 'rtl-app-bar' : 'ltr-app-bar',
 			isMobile ? 'mobile-navbar' : 'desktop-navbar',
@@ -21,8 +22,8 @@
 			/>
 
 			<v-img
-				:src="posLogo"
-				alt="POS Awesome"
+				:src="branding.logo || posLogo"
+				:alt="branding.name"
 				:max-width="isMobile ? 24 : 32"
 				:class="['pos-navbar-logo', isRtl ? 'rtl-logo' : 'ltr-logo']"
 				loading="lazy"
@@ -41,11 +42,10 @@
 				role="button"
 			>
 				<template v-if="isMobile">
-					<span class="pos-navbar-title-compact">{{ __("POS") }}</span>
+					<span class="pos-navbar-title-compact">{{ branding.shortName }}</span>
 				</template>
 				<template v-else>
-					<span class="font-weight-light pos-navbar-title-light">{{ __("POS") }}</span
-					><span class="pos-navbar-title-bold">{{ __("Awesome") }}</span>
+					<span class="pos-navbar-title-light">{{ branding.name }}</span>
 				</template>
 			</v-toolbar-title>
 		</div>
@@ -231,6 +231,8 @@
 
 <script>
 import { useRtl } from "../../composables/core/useRtl";
+import { resolvePosBranding } from "../../config/branding";
+import { isCounterGridTemplate } from "../../utils/posUiTemplate";
 import posLogo from "../pos/pos.png";
 import NavbarInfoGadgets from "./NavbarInfoGadgets.vue";
 
@@ -269,6 +271,17 @@ export default {
 			this.resizeRafId = null;
 		}
 	},
+	watch: {
+		branding: {
+			handler(value) {
+				if (typeof document !== "undefined") {
+					document.title = value.name;
+				}
+			},
+			deep: true,
+			immediate: true,
+		},
+	},
 	props: {
 		posProfile: {
 			type: Object,
@@ -300,6 +313,9 @@ export default {
 		},
 	},
 	computed: {
+		branding() {
+			return resolvePosBranding(this.posProfile);
+		},
 		appBarColor() {
 			return this.$theme.isDark ? this.$vuetify.theme.themes.dark.colors.surface : "white";
 		},
@@ -350,6 +366,10 @@ export default {
 		isDesktop() {
 			return this.windowWidth >= 1024;
 		},
+
+		isCounterGrid() {
+			return isCounterGridTemplate(this.posProfile, this.windowWidth);
+		},
 	},
 
 	methods: {
@@ -391,18 +411,72 @@ export default {
 <style scoped>
 /* Enhanced Navbar Styling */
 .pos-navbar-enhanced {
-	background-image: linear-gradient(
-		135deg,
-		var(--pos-bg-primary) 0%,
-		var(--pos-bg-secondary) 100%
-	) !important;
+	background-image: none !important;
 	background-color: var(--pos-bg-primary) !important;
-	border-bottom: 2px solid var(--pos-border) !important;
-	backdrop-filter: blur(10px);
-	transition: all 0.3s ease;
-	padding-bottom: 4px !important;
+	border-bottom: 1px solid var(--pos-border) !important;
+	box-shadow: var(--pos-elevation-1) !important;
+	backdrop-filter: blur(14px);
+	transition:
+		border-color 160ms ease,
+		box-shadow 160ms ease;
+	padding-bottom: 2px !important;
 	overflow: visible !important;
 	color: var(--pos-text-primary) !important;
+}
+
+.pos-navbar-enhanced--counter-grid {
+	background: #09253d !important;
+	background-image: none !important;
+	border-bottom: 2px solid #38bdf8 !important;
+	box-shadow: 0 3px 0 rgba(5, 20, 34, 0.38) !important;
+	color: #ffffff !important;
+}
+
+.pos-navbar-enhanced--counter-grid .pos-navbar-title-light,
+.pos-navbar-enhanced--counter-grid .pos-navbar-title-compact {
+	color: #ffffff !important;
+}
+
+.pos-navbar-enhanced--counter-grid .pos-navbar-title-bold {
+	color: #39a0ff !important;
+}
+
+.pos-navbar-enhanced--counter-grid .nav-icon,
+.pos-navbar-enhanced--counter-grid .offline-invoices-btn,
+.pos-navbar-enhanced--counter-grid .profile-chip {
+	background: #102f4a !important;
+	border: 1px solid #315773 !important;
+	border-radius: 5px !important;
+	box-shadow: none !important;
+	color: #ffffff !important;
+}
+
+.pos-navbar-enhanced--counter-grid .profile-chip__meta {
+	color: #c4d4e1 !important;
+}
+
+.pos-navbar-enhanced--counter-grid .pos-text-primary,
+.pos-navbar-enhanced--counter-grid .v-icon.pos-text-primary,
+.pos-navbar-enhanced--counter-grid .mdi-menu-down,
+.pos-navbar-enhanced--counter-grid .v-icon--end.pos-text-primary {
+	color: #eaf6ff !important;
+}
+
+.pos-navbar-enhanced--counter-grid :deep(.status-btn-enhanced),
+.pos-navbar-enhanced--counter-grid :deep(.notification-bell-trigger),
+.pos-navbar-enhanced--counter-grid :deep(.menu-btn-compact) {
+	background: #102f4a !important;
+	border: 1px solid #315773 !important;
+	border-radius: 5px !important;
+	box-shadow: none !important;
+	color: #ffffff !important;
+}
+
+.pos-navbar-enhanced--counter-grid :deep(.status-title-inline),
+.pos-navbar-enhanced--counter-grid :deep(.menu-btn-compact .v-btn__content),
+.pos-navbar-enhanced--counter-grid :deep(.notification-bell-trigger .v-icon),
+.pos-navbar-enhanced--counter-grid :deep(.menu-btn-compact .v-icon) {
+	color: #ffffff !important;
 }
 
 /* RTL/LTR App Bar Layout */
@@ -525,12 +599,12 @@ export default {
 }
 
 .pos-navbar-enhanced:hover {
-	box-shadow: 0 4px 20px var(--pos-shadow) !important;
+	box-shadow: var(--pos-elevation-1) !important;
 }
 
 /* Logo Styling */
 .pos-navbar-logo {
-	transition: transform 0.3s ease;
+	transition: transform 160ms ease;
 }
 
 .rtl-logo {
@@ -545,7 +619,7 @@ export default {
 }
 
 .pos-navbar-logo:hover {
-	transform: scale(1.05);
+	transform: scale(1.02);
 }
 
 @media (max-width: 960px) {
@@ -585,7 +659,7 @@ export default {
 .pos-navbar-title {
 	text-decoration: none !important;
 	border-bottom: none !important;
-	transition: color 0.3s ease;
+	transition: color 160ms ease;
 	white-space: nowrap;
 	overflow: hidden !important;
 	text-overflow: ellipsis;
@@ -595,7 +669,7 @@ export default {
 	max-width: 100%;
 	flex: 1 1 auto;
 	/* Use same blue as Menu button - matching gradient blue */
-	color: #1976d2 !important;
+	color: var(--pos-primary) !important;
 }
 
 .pos-navbar-title:hover {
@@ -619,7 +693,7 @@ export default {
 
 /* Title Text Styling */
 .pos-navbar-title-light {
-	font-weight: 300 !important;
+	font-weight: 500 !important;
 	letter-spacing: 0.5px;
 	margin-right: 2px;
 	display: inline-block;
@@ -629,7 +703,7 @@ export default {
 }
 
 .pos-navbar-title-bold {
-	font-weight: 700 !important;
+	font-weight: 750 !important;
 	letter-spacing: 0.25px;
 	display: inline-block;
 	white-space: nowrap;
@@ -650,23 +724,22 @@ export default {
 
 /* Navigation Icon - Elite Style */
 .nav-icon {
-	border-radius: 12px;
+	border-radius: var(--pos-radius-sm);
 	padding: 8px;
 	transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 	min-width: 40px;
 	min-height: 40px;
-	color: #1976d2 !important;
-	background: rgba(25, 118, 210, 0.08) !important;
-	border: 1px solid rgba(25, 118, 210, 0.12);
-	backdrop-filter: blur(8px);
+	color: var(--pos-primary) !important;
+	background: var(--pos-primary-container) !important;
+	border: 1px solid var(--pos-border-light);
 }
 
 .nav-icon:hover {
-	background: rgba(25, 118, 210, 0.12) !important;
-	color: #1565c0 !important;
-	border-color: rgba(25, 118, 210, 0.2);
+	background: color-mix(in srgb, var(--pos-primary-container) 82%, var(--pos-primary)) !important;
+	color: var(--pos-primary-variant) !important;
+	border-color: var(--pos-primary);
 	transform: translateY(-1px);
-	box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
+	box-shadow: var(--pos-elevation-1);
 }
 
 .rtl-nav-icon {
@@ -699,10 +772,9 @@ export default {
 }
 
 .profile-chip {
-	color: #1976d2 !important;
-	border-color: rgba(25, 118, 210, 0.2) !important;
-	background: rgba(25, 118, 210, 0.06) !important;
-	backdrop-filter: blur(8px);
+	color: var(--pos-primary) !important;
+	border-color: var(--pos-border) !important;
+	background: var(--pos-surface-muted) !important;
 }
 
 .rtl-profile-section {
@@ -716,7 +788,7 @@ export default {
 .profile-chip {
 	font-weight: 500;
 	padding: 8px 16px;
-	border-radius: 20px;
+	border-radius: var(--pos-radius-sm);
 	transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 	display: flex;
 	align-items: center;
@@ -744,9 +816,9 @@ export default {
 
 .profile-chip:hover {
 	transform: translateY(-1px);
-	background: rgba(25, 118, 210, 0.1) !important;
-	border-color: rgba(25, 118, 210, 0.25) !important;
-	box-shadow: 0 4px 12px rgba(25, 118, 210, 0.12);
+	background: var(--pos-primary-container) !important;
+	border-color: var(--pos-primary) !important;
+	box-shadow: var(--pos-elevation-1);
 }
 
 /* RTL Profile Chip Styling */
@@ -817,26 +889,25 @@ export default {
 	padding: 4px;
 	min-width: 40px;
 	min-height: 40px;
-	background: rgba(25, 118, 210, 0.08) !important;
-	border: 1px solid rgba(25, 118, 210, 0.12);
-	border-radius: 12px;
-	backdrop-filter: blur(8px);
+	background: var(--pos-primary-container) !important;
+	border: 1px solid var(--pos-border-light);
+	border-radius: var(--pos-radius-sm);
 }
 
 .offline-invoices-btn .pos-text-primary {
-	color: #1976d2 !important;
+	color: var(--pos-primary) !important;
 }
 
 /* Elite styling for navbar text and icons */
 .pos-navbar-enhanced .pos-text-primary {
-	color: #1976d2 !important;
+	color: var(--pos-primary) !important;
 }
 
 /* Ensure profile text and icons use elite colors */
 .profile-chip .pos-text-primary,
 .profile-chip .ltr-profile-text,
 .profile-chip .rtl-profile-text {
-	color: #1976d2 !important;
+	color: var(--pos-primary) !important;
 	font-weight: 500;
 }
 
@@ -844,12 +915,12 @@ export default {
 .pos-navbar-enhanced .v-icon.pos-text-primary,
 .pos-navbar-enhanced .mdi-menu-down,
 .pos-navbar-enhanced .v-icon--end.pos-text-primary {
-	color: #1976d2 !important;
+	color: var(--pos-primary) !important;
 	transition: color 0.25s ease;
 }
 
 .pos-navbar-enhanced .v-icon.pos-text-primary:hover {
-	color: #1565c0 !important;
+	color: var(--pos-primary-variant) !important;
 }
 
 .rtl-offline-btn {

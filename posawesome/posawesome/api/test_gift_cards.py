@@ -5,6 +5,17 @@ import types
 import unittest
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
+_ORIGINAL_MODULES = dict(sys.modules)
+
+
+def tearDownModule():
+    managed_prefixes = ("frappe", "erpnext.setup.utils", "posawesome")
+    for name in list(sys.modules):
+        if name.startswith(managed_prefixes) and name not in _ORIGINAL_MODULES:
+            sys.modules.pop(name, None)
+    for name, module in _ORIGINAL_MODULES.items():
+        if name.startswith(managed_prefixes):
+            sys.modules[name] = module
 
 
 class FakeGiftCard:
@@ -121,7 +132,16 @@ def _install_stubs():
     frappe_module = types.ModuleType("frappe")
     frappe_utils_module = types.ModuleType("frappe.utils")
     employees_module = types.ModuleType("posawesome.posawesome.api.employees")
+    pos_access_module = types.ModuleType("posawesome.posawesome.api.pos_access")
+    terminal_state_module = types.ModuleType("posawesome.posawesome.api.terminal_state")
+    erpnext_setup_utils_module = types.ModuleType("erpnext.setup.utils")
+    erpnext_setup_utils_module.get_exchange_rate = lambda *_args, **_kwargs: 1
     utilities_module = types.ModuleType("posawesome.posawesome.api.utilities")
+    utilities_module.resolve_erpnext_currency_rates = lambda *_args, **_kwargs: {
+        "conversion_rate": 1.0,
+        "plc_conversion_rate": 1.0,
+        "exchange_rate_date": None,
+    }
 
     state = {
         "cards": {},
@@ -144,6 +164,7 @@ def _install_stubs():
             ),
         },
         "invoices": {"ACC-SINV-0001": FakeInvoice()},
+        "active_cashier": "supervisor@example.com",
         "pos_profiles": {
             "Main POS": types.SimpleNamespace(
                 name="Main POS",
@@ -213,6 +234,7 @@ def _install_stubs():
     frappe_module.get_cached_doc = lambda doctype, name: (
         state["pos_profiles"][name] if doctype == "POS Profile" else state["companies"][name]
     )
+    frappe_module.get_cached_value = lambda *args, **kwargs: None
     frappe_module.get_value = lambda doctype, name, fieldname: (
         getattr(state["pos_profiles"][name], fieldname, None)
         if doctype == "POS Profile"
@@ -240,11 +262,23 @@ def _install_stubs():
     employees_module._is_pos_supervisor = lambda user_doc: bool(
         getattr(user_doc, "posa_is_pos_supervisor", 0)
     )
+    pos_access_module.get_authorized_pos_profile = (
+        lambda pos_profile=None: state["pos_profiles"][str(pos_profile or "").strip()]
+    )
+    pos_access_module.user_can_manage_pos = (
+        lambda user: bool(getattr(state["user_docs"].get(user), "posa_is_pos_supervisor", 0))
+    )
+    terminal_state_module.get_active_terminal_cashier = (
+        lambda pos_profile=None: state["active_cashier"]
+    )
     utilities_module.ensure_child_doctype = lambda *args, **kwargs: None
 
     sys.modules["frappe"] = frappe_module
     sys.modules["frappe.utils"] = frappe_utils_module
     sys.modules["posawesome.posawesome.api.employees"] = employees_module
+    sys.modules["posawesome.posawesome.api.pos_access"] = pos_access_module
+    sys.modules["posawesome.posawesome.api.terminal_state"] = terminal_state_module
+    sys.modules["erpnext.setup.utils"] = erpnext_setup_utils_module
     sys.modules["posawesome.posawesome.api.utilities"] = utilities_module
     return state
 
@@ -283,6 +317,7 @@ class TestGiftCardApi(unittest.TestCase):
         self.state["new_docs"].clear()
         self.state["journal_entries"].clear()
         self.state["mode_of_payments"].clear()
+        self.state["active_cashier"] = "supervisor@example.com"
         profile_doc = self.state["pos_profiles"]["Main POS"]
         profile_doc.posa_use_gift_cards = 1
         profile_doc.posa_default_source_account = "1110 - Cash - TC"
@@ -292,6 +327,7 @@ class TestGiftCardApi(unittest.TestCase):
             invoice_doc.payments = []
 
     def test_issue_gift_card_requires_supervisor(self):
+        self.state["active_cashier"] = "cashier@example.com"
         with self.assertRaises(Exception) as ctx:
             self.module.issue_gift_card(
                 pos_profile="Main POS",
@@ -302,6 +338,40 @@ class TestGiftCardApi(unittest.TestCase):
             )
 
         self.assertIn("POS supervisor", str(ctx.exception))
+
+    def test_client_cashier_is_ignored_in_favor_of_server_terminal_state(self):
+        result = self.module.issue_gift_card(
+            pos_profile="Main POS",
+            cashier="cashier@example.com",
+            company="Test Company",
+            initial_amount=0,
+            gift_card_code="GC-SERVER-CASHIER",
+        )
+
+        self.assertEqual(result["gift_card_code"], "GC-SERVER-CASHIER")
+        self.assertEqual(
+            self.state["new_docs"][-1].issued_by,
+            "supervisor@example.com",
+        )
+
+    def test_issue_gift_card_uses_profile_company_and_rejects_forged_company(self):
+        with self.assertRaisesRegex(Exception, "does not match the authorized POS Profile"):
+            self.module.issue_gift_card(
+                pos_profile="Main POS",
+                cashier="supervisor@example.com",
+                company="Other Company",
+                initial_amount=0,
+                gift_card_code="GC-FORGED-COMPANY",
+            )
+
+        result = self.module.issue_gift_card(
+            pos_profile="Main POS",
+            cashier="supervisor@example.com",
+            company=None,
+            initial_amount=0,
+            gift_card_code="GC-CANONICAL-COMPANY",
+        )
+        self.assertEqual(result["company"], "Test Company")
 
     def test_top_up_updates_balance_and_transaction_history(self):
         existing = FakeGiftCard(code="GC-0001", balance=500, status="Active")
@@ -330,6 +400,22 @@ class TestGiftCardApi(unittest.TestCase):
             self.state["journal_entries"][0].accounts[1]["account"],
             "2190 - Gift Card Liability - TC",
         )
+
+    def test_top_up_rejects_card_from_another_company(self):
+        existing = FakeGiftCard(code="GC-OTHER-COMPANY", balance=500, status="Active")
+        existing.company = "Other Company"
+        self.state["cards"][existing.gift_card_code] = existing
+
+        with self.assertRaisesRegex(Exception, "does not belong to company Test Company"):
+            self.module.top_up_gift_card(
+                pos_profile="Main POS",
+                cashier="supervisor@example.com",
+                gift_card_code="GC-OTHER-COMPANY",
+                amount=250,
+            )
+
+        self.assertEqual(existing.current_balance, 500)
+        self.assertEqual(self.state["journal_entries"], [])
 
     def test_apply_invoice_gift_card_redemptions_records_invoice_rows(self):
         existing = FakeGiftCard(code="GC-0002", balance=800, status="Active")

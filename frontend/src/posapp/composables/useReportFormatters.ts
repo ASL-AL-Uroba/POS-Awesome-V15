@@ -10,16 +10,22 @@ const defaultTranslate: Translator = (value) => (window.__ ? window.__(value) : 
 export function createReportFormatters(options: ReportFormatterOptions) {
 	const __ = options.translate || defaultTranslate;
 
-	function formatMoney(value: number) {
+	function formatMoneyInCurrency(value: number, currency?: string) {
 		const amount = Number(value || 0);
 		const formatted = new Intl.NumberFormat(undefined, {
 			minimumFractionDigits: 2,
 			maximumFractionDigits: 2,
 		}).format(amount);
-		const currency = options.getCurrency();
+		const resolvedCurrency = currency || options.getCurrency();
 		const symbol =
-			typeof get_currency_symbol === "function" && currency ? get_currency_symbol(currency) : "";
-		return symbol ? `${symbol} ${formatted}` : formatted;
+			typeof get_currency_symbol === "function" && resolvedCurrency
+				? get_currency_symbol(resolvedCurrency)
+				: "";
+		return symbol ? `${symbol} ${formatted}` : `${resolvedCurrency} ${formatted}`.trim();
+	}
+
+	function formatMoney(value: number) {
+		return formatMoneyInCurrency(value, options.getCurrency());
 	}
 
 	function formatQuantity(value: number) {
@@ -173,6 +179,7 @@ export function createReportFormatters(options: ReportFormatterOptions) {
 
 	return {
 		formatMoney,
+		formatMoneyInCurrency,
 		formatQuantity,
 		formatSignedQuantity,
 		formatDate,

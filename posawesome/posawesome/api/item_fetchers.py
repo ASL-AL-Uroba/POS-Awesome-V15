@@ -46,6 +46,27 @@ _serial_cache: Dict[int, Callable[..., Any]] = {}
 _bom_cache: Dict[int, Callable[..., Any]] = {}
 
 
+def clear_stock_caches(doc=None, method=None):
+    """Invalidate the stock / batch / serial redis caches.
+
+    These caches are wrapped with ``redis_cache(ttl=...)`` but were never
+    invalidated, so after any stock movement other POS terminals kept seeing
+    pre-movement quantities for up to the configured TTL. Wired (via hooks) to
+    Bin / Stock Ledger Entry / Serial No / Batch writes so quantities refresh
+    as soon as stock actually changes. Each cache holds one wrapper per TTL
+    variant, so clear them all.
+    """
+    for store in (_bin_cache, _batch_cache, _serial_cache):
+        for cached_fn in list(store.values()):
+            clearer = getattr(cached_fn, "clear_cache", None)
+            if callable(clearer):
+                try:
+                    clearer()
+                except Exception:
+                    # Cache invalidation must never break the triggering write
+                    frappe.log_error(frappe.get_traceback(), "POSAwesome stock cache clear failed")
+
+
 def _fetch_item_prices(
     price_list: str,
     currency: str,
@@ -68,17 +89,21 @@ def _fetch_item_prices(
     query = """
         SELECT
             item_code,
+            price_list,
             price_list_rate,
             currency,
             uom,
-            customer
+            customer,
+            supplier
         FROM (
             SELECT
                 item_code,
+                price_list,
                 price_list_rate,
                 currency,
                 uom,
                 customer,
+                supplier,
                 valid_from,
                 valid_upto
             FROM `tabItem Price`
@@ -88,6 +113,7 @@ def _fetch_item_prices(
                 AND currency = %(currency)s
                 AND (valid_from IS NULL OR valid_from <= %(today)s)
                 AND IFNULL(customer, '') IN ('', %(customer)s)
+                AND IFNULL(supplier, '') = ''
                 AND (valid_upto IS NULL OR valid_upto = '' OR valid_upto >= %(today)s)
         ) ip
         ORDER BY IFNULL(customer, '') ASC, valid_from ASC, valid_upto DESC
@@ -158,6 +184,7 @@ def _fetch_item_meta(item_codes: Tuple[str, ...]):
         "allow_negative_stock",
         "purchase_uom",
         "standard_rate",
+        "last_purchase_rate",
     ]
     if frappe.db.has_column("Item", "default_bom"):
         fields.append("default_bom")
@@ -184,7 +211,7 @@ def _fetch_barcodes(item_codes: Tuple[str, ...]):
         return []
     return frappe.get_all(
         "Item Barcode",
-        fields=["parent", "barcode", "uom", "posa_qty"],
+        fields=["parent", "barcode", "barcode_type", "uom", "posa_qty"],
         filters={"parent": ["in", item_codes]},
     )
 
@@ -215,11 +242,14 @@ def get_uoms(item_codes: Sequence[str], ttl: Optional[int] = None):
     return cached(tuple(item_codes))
 
 
-def _normalize_warehouses(warehouse: Optional[str]) -> Tuple[str, ...]:
+def _normalize_warehouses(warehouse: Optional[str | Sequence[str]]) -> Tuple[str, ...]:
     """Return a tuple of concrete warehouses for the provided warehouse or group."""
 
     if not warehouse:
         return tuple()
+
+    if not isinstance(warehouse, str):
+        return tuple(sorted({w for w in warehouse if w}))
 
     if frappe.db.get_value("Warehouse", warehouse, "is_group"):
         descendants = frappe.db.get_descendants("Warehouse", warehouse) or []
@@ -230,7 +260,7 @@ def _normalize_warehouses(warehouse: Optional[str]) -> Tuple[str, ...]:
     return (warehouse,)
 
 
-def _fetch_batches(warehouse: str, item_codes: Tuple[str, ...]):
+def _fetch_batches(warehouse: str | Sequence[str], item_codes: Tuple[str, ...]):
     """Collect batch information (including expired entries) for the given warehouse."""
 
     if not item_codes or not warehouse:
@@ -449,6 +479,7 @@ def get_bom_costs(meta_rows: Sequence[frappe._dict], ttl: Optional[int] = None):
 @dataclass(frozen=True)
 class ItemLookupData:
     price_map: Dict[str, Dict[str, frappe._dict]]
+    buying_price_map: Dict[str, Dict[str, frappe._dict]]
     stock_map: Dict[str, float]
     meta_map: Dict[str, frappe._dict]
     uom_map: Dict[str, List[Dict[str, Any]]]
@@ -495,6 +526,7 @@ def merge_item_row(
     lookup_data: ItemLookupData,
     price_list_currency: Optional[str],
     exchange_rate: float,
+    buying_exchange_rate: Optional[float] = 1,
 ) -> Dict[str, Any]:
     """Merge lookup data into a POS item row for downstream consumption."""
 
@@ -506,6 +538,9 @@ def merge_item_row(
     uoms = _ensure_stock_uom(lookup_data.uom_map.get(item_code, []), meta.get("stock_uom"))
     price_row = _select_price(
         lookup_data.price_map.get(item_code, {}), item.get("uom"), meta.get("stock_uom")
+    )
+    buying_price_row = _select_price(
+        lookup_data.buying_price_map.get(item_code, {}), item.get("uom"), meta.get("stock_uom")
     )
     price_currency = price_row.get("currency") if price_row else None
 
@@ -526,6 +561,11 @@ def merge_item_row(
             "purchase_uom": meta.get("purchase_uom"),
             "standard_rate": meta.get("standard_rate"),
             "valuation_rate": meta.get("valuation_rate"),
+            "last_purchase_rate": meta.get("last_purchase_rate"),
+            "trade_price": buying_price_row.get("price_list_rate") if buying_price_row else None,
+            "buying_rate": buying_price_row.get("price_list_rate") if buying_price_row else None,
+            "buying_price_list": buying_price_row.get("price_list") if buying_price_row else None,
+            "buying_price_currency": buying_price_row.get("currency") if buying_price_row else None,
             "default_bom": meta.get("default_bom"),
             "batch_no_data": batch_rows,
             "serial_no_data": lookup_data.serial_map.get(item_code, []),
@@ -542,6 +582,31 @@ def merge_item_row(
         row["manufacturing_cost"] = bom_cost.get("rate")
         row["manufacturing_cost_source"] = bom_cost.get("source")
         row["manufacturing_bom"] = bom_cost.get("bom")
+    prices_by_uom: Dict[str, Dict[str, object]] = {}
+    for uom_key, pr in lookup_data.price_map.get(item_code, {}).items():
+        uom_name = "" if uom_key == "None" else uom_key
+        prices_by_uom[uom_name] = {
+            "price_list_rate": pr.get("price_list_rate"),
+            "currency": pr.get("currency"),
+        }
+    row["_prices_by_uom"] = prices_by_uom
+    buying_prices_by_uom: Dict[str, Dict[str, object]] = {}
+    for uom_key, pr in lookup_data.buying_price_map.get(item_code, {}).items():
+        uom_name = "" if uom_key == "None" else uom_key
+        raw_rate = flt(pr.get("price_list_rate"))
+        normalized_rate = (
+            raw_rate * flt(buying_exchange_rate)
+            if flt(buying_exchange_rate) > 0
+            else None
+        )
+        buying_prices_by_uom[uom_name] = {
+            "price_list_rate": raw_rate,
+            "base_price_list_rate": normalized_rate,
+            "currency": pr.get("currency"),
+            "price_list": pr.get("price_list"),
+        }
+    row["_buying_prices_by_uom"] = buying_prices_by_uom
+
     if not row.get("item_name") and meta.get("item_name"):
         row["item_name"] = meta.get("item_name")
     return row
@@ -562,8 +627,9 @@ class ItemDetailAggregator:
         self.cache_ttl = self._resolve_ttl()
         self.today = nowdate()
         self.warehouse = pos_profile.get("warehouse")
-        self.price_list_currency = self._determine_price_list_currency()
+        self.price_list_currency = self._determine_price_list_currency(self.price_list)
         self.exchange_rate = self._compute_exchange_rate()
+        self.buying_exchange_rate = 1.0
 
     def _resolve_ttl(self) -> Optional[int]:
         """Convert the POS profile cache duration to seconds."""
@@ -576,13 +642,25 @@ class ItemDetailAggregator:
         except Exception:
             return None
 
-    def _determine_price_list_currency(self) -> Optional[str]:
+    def _determine_price_list_currency(self, price_list: Optional[str]) -> Optional[str]:
         """Resolve the currency backing the active selling price list."""
 
-        if not self.price_list:
+        if not price_list:
             return self.pos_profile.get("currency")
-        return frappe.db.get_value("Price List", self.price_list, "currency") or self.pos_profile.get(
+        return frappe.db.get_value("Price List", price_list, "currency") or self.pos_profile.get(
             "currency"
+        )
+
+    def _resolve_buying_price_list(self) -> Optional[str]:
+        """Resolve the buying/trade price list used as POS loss floor."""
+
+        profile_buying = self.pos_profile.get("buying_price_list")
+        if profile_buying:
+            return profile_buying
+        return (
+            frappe.db.get_single_value("Buying Settings", "buying_price_list")
+            or frappe.db.get_value("Price List", {"buying": 1}, "name")
+            or ("Standard Buying" if frappe.db.exists("Price List", "Standard Buying") else None)
         )
 
     def _compute_exchange_rate(self) -> float:
@@ -613,7 +691,7 @@ class ItemDetailAggregator:
 
         item_codes_tuple = _normalize_codes(item_codes)
         if not item_codes_tuple:
-            return ItemLookupData({}, {}, {}, {}, {}, {}, {}, {})
+            return ItemLookupData({}, {}, {}, {}, {}, {}, {}, {}, {})
 
         use_cache = bool(self.pos_profile.get("posa_use_server_cache"))
 
@@ -627,7 +705,7 @@ class ItemDetailAggregator:
                     self.customer,
                     today=self.today,
                     ttl=self.cache_ttl,
-                )
+                ) or []
             else:
                 price_rows = _fetch_item_prices(
                     self.price_list,
@@ -637,14 +715,53 @@ class ItemDetailAggregator:
                     self.today,
                 )
 
+        buying_price_list = self._resolve_buying_price_list()
+        buying_price_currency = self._determine_price_list_currency(buying_price_list)
+        company = self.pos_profile.get("company")
+        company_currency = (
+            frappe.db.get_value("Company", company, "default_currency") if company else None
+        )
+        if buying_price_currency and company_currency and buying_price_currency != company_currency:
+            try:
+                self.buying_exchange_rate = get_exchange_rate(
+                    buying_price_currency, company_currency, self.today
+                )
+            except Exception:
+                self.buying_exchange_rate = None
+                frappe.log_error(
+                    f"Missing exchange rate from {buying_price_currency} to {company_currency}",
+                    "POS Awesome buying floor",
+                )
+        else:
+            self.buying_exchange_rate = 1.0
+        buying_price_rows = []
+        if buying_price_list:
+            if use_cache:
+                buying_price_rows = get_item_prices(
+                    buying_price_list,
+                    buying_price_currency or self.pos_profile.get("currency"),
+                    item_codes_tuple,
+                    None,
+                    today=self.today,
+                    ttl=self.cache_ttl,
+                ) or []
+            else:
+                buying_price_rows = _fetch_item_prices(
+                    buying_price_list,
+                    buying_price_currency or self.pos_profile.get("currency"),
+                    item_codes_tuple,
+                    "",
+                    self.today,
+                )
+
         # Stock, metadata, UOM and barcode data are reused both for batches and the
         # final merged item rows, so collect them up front.
         if use_cache:
-            stock_rows = get_bin_qty(self.warehouse, item_codes_tuple, ttl=self.cache_ttl)
-            meta_rows = get_item_meta(item_codes_tuple, ttl=self.cache_ttl)
-            uom_rows = get_uoms(item_codes_tuple, ttl=self.cache_ttl)
-            barcode_rows = get_barcodes(item_codes_tuple, ttl=self.cache_ttl)
-            bom_map = get_bom_costs(meta_rows, ttl=self.cache_ttl)
+            stock_rows = get_bin_qty(self.warehouse, item_codes_tuple, ttl=self.cache_ttl) or []
+            meta_rows = get_item_meta(item_codes_tuple, ttl=self.cache_ttl) or []
+            uom_rows = get_uoms(item_codes_tuple, ttl=self.cache_ttl) or []
+            barcode_rows = get_barcodes(item_codes_tuple, ttl=self.cache_ttl) or []
+            bom_map = get_bom_costs(meta_rows, ttl=self.cache_ttl) or {}
         else:
             stock_rows = _fetch_bin_qty(self.warehouse, item_codes_tuple)
             meta_rows = _fetch_item_meta(item_codes_tuple)
@@ -662,8 +779,8 @@ class ItemDetailAggregator:
         serial_items = [row.name for row in meta_rows if row.get("has_serial_no")]
 
         if use_cache:
-            batch_rows = get_batches(self.warehouse, _normalize_codes(batch_items), ttl=self.cache_ttl)
-            serial_rows = get_serials(self.warehouse, _normalize_codes(serial_items), ttl=self.cache_ttl)
+            batch_rows = get_batches(self.warehouse, _normalize_codes(batch_items), ttl=self.cache_ttl) or []
+            serial_rows = get_serials(self.warehouse, _normalize_codes(serial_items), ttl=self.cache_ttl) or []
         else:
             batch_rows = _fetch_batches(self.warehouse, _normalize_codes(batch_items))
             serial_rows = _fetch_serials(self.warehouse, _normalize_codes(serial_items))
@@ -671,6 +788,10 @@ class ItemDetailAggregator:
         price_map: Dict[str, Dict[str, frappe._dict]] = {}
         for row in price_rows:
             price_map.setdefault(row.item_code, {})[row.get("uom") or "None"] = row
+
+        buying_price_map: Dict[str, Dict[str, frappe._dict]] = {}
+        for row in buying_price_rows:
+            buying_price_map.setdefault(row.item_code, {})[row.get("uom") or "None"] = row
 
         stock_map = {row.item_code: row.actual_qty for row in stock_rows}
         meta_map = {row.name: row for row in meta_rows}
@@ -683,7 +804,12 @@ class ItemDetailAggregator:
 
         barcode_map: Dict[str, List[Dict[str, object]]] = {}
         for row in barcode_rows:
-            barcode_map.setdefault(row.parent, []).append({"barcode": row.barcode, "uom": row.uom, "posa_qty": row.posa_qty or 0})
+            barcode_map.setdefault(row.parent, []).append({
+                "barcode": row.barcode,
+                "barcode_type": getattr(row, "barcode_type", ""),
+                "uom": row.uom,
+                "posa_qty": getattr(row, "posa_qty", 0) or 0,
+            })
 
         batch_map: Dict[str, List[Dict[str, object]]] = {}
         for row in batch_rows:
@@ -709,6 +835,7 @@ class ItemDetailAggregator:
 
         return ItemLookupData(
             price_map=price_map,
+            buying_price_map=buying_price_map,
             stock_map=stock_map,
             meta_map=meta_map,
             uom_map=uom_map,
@@ -738,6 +865,7 @@ class ItemDetailAggregator:
                     lookup_data,
                     self.price_list_currency or self.pos_profile.get("currency"),
                     self.exchange_rate,
+                    self.buying_exchange_rate,
                 )
             )
         return result

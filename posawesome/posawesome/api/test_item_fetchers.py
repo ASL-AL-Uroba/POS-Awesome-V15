@@ -5,6 +5,14 @@ import types
 import unittest
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
+STUBBED_MODULE_NAMES = (
+    "frappe",
+    "frappe.query_builder",
+    "frappe.query_builder.functions",
+    "frappe.utils",
+    "frappe.utils.caching",
+    "erpnext.setup.utils",
+)
 
 
 class AttrDict(dict):
@@ -79,8 +87,18 @@ def _load_module():
 class TestItemFetchers(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.original_modules = {name: sys.modules.get(name) for name in STUBBED_MODULE_NAMES}
         _install_stubs()
         cls.module = _load_module()
+
+    @classmethod
+    def tearDownClass(cls):
+        sys.modules.pop("test_item_fetchers_target", None)
+        for name, original in cls.original_modules.items():
+            if original is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = original
 
     def test_get_bom_costs_prefers_item_default_bom(self):
         meta_rows = [
@@ -129,6 +147,7 @@ class TestItemFetchers(unittest.TestCase):
     def test_merge_item_row_exposes_bom_cost_metadata(self):
         lookup = self.module.ItemLookupData(
             price_map={},
+            buying_price_map={},
             stock_map={},
             meta_map={"ITEM-001": AttrDict({"name": "ITEM-001", "stock_uom": "Nos"})},
             uom_map={},
@@ -149,6 +168,53 @@ class TestItemFetchers(unittest.TestCase):
         self.assertEqual(row["manufacturing_cost_source"], "bom")
         self.assertEqual(row["manufacturing_bom"], "BOM-ITEM-001")
 
+    def test_merge_item_row_exposes_base_currency_buying_prices_by_uom(self):
+        lookup = self.module.ItemLookupData(
+            price_map={},
+            buying_price_map={
+                "ITEM-001": {
+                    "Nos": AttrDict(
+                        {
+                            "price_list_rate": 2,
+                            "currency": "USD",
+                            "price_list": "Standard Buying",
+                        }
+                    ),
+                    "Box": AttrDict(
+                        {
+                            "price_list_rate": 18,
+                            "currency": "USD",
+                            "price_list": "Standard Buying",
+                        }
+                    ),
+                }
+            },
+            stock_map={},
+            meta_map={"ITEM-001": AttrDict({"name": "ITEM-001", "stock_uom": "Nos"})},
+            uom_map={"ITEM-001": [{"uom": "Box", "conversion_factor": 10}]},
+            barcode_map={},
+            batch_map={},
+            serial_map={},
+            bom_map={},
+        )
+
+        row = self.module.merge_item_row(
+            {"item_code": "ITEM-001", "uom": "Box"},
+            lookup,
+            "PKR",
+            1,
+            buying_exchange_rate=280,
+        )
+
+        self.assertEqual(
+            row["_buying_prices_by_uom"]["Nos"]["base_price_list_rate"],
+            560,
+        )
+        self.assertEqual(
+            row["_buying_prices_by_uom"]["Box"]["base_price_list_rate"],
+            5040,
+        )
+
     def test_fetch_barcodes_includes_standard_uom_field(self):
         calls = []
 
@@ -164,6 +230,45 @@ class TestItemFetchers(unittest.TestCase):
         self.assertEqual(calls[0][0], "Item Barcode")
         self.assertIn("uom", calls[0][1]["fields"])
         self.assertNotIn("posa_uom", calls[0][1]["fields"])
+
+    def test_cached_lookup_none_values_degrade_to_empty_collections(self):
+        lookup_names = (
+            "get_item_prices",
+            "get_bin_qty",
+            "get_item_meta",
+            "get_uoms",
+            "get_barcodes",
+            "get_bom_costs",
+            "get_batches",
+            "get_serials",
+        )
+        originals = {name: getattr(self.module, name) for name in lookup_names}
+        try:
+            for name in lookup_names:
+                setattr(self.module, name, lambda *args, **kwargs: None)
+
+            aggregator = self.module.ItemDetailAggregator(
+                {
+                    "name": "POS Profile",
+                    "company": "MedPlus Pharmacy",
+                    "currency": "PKR",
+                    "selling_price_list": "Standard Selling",
+                    "warehouse": "Main Store - MP",
+                    "posa_use_server_cache": 1,
+                }
+            )
+            aggregator._resolve_buying_price_list = lambda: "Standard Buying"
+
+            lookup = aggregator._prepare_lookup(["ITEM-001"])
+
+            self.assertEqual(lookup.price_map, {})
+            self.assertEqual(lookup.buying_price_map, {})
+            self.assertEqual(lookup.stock_map, {})
+            self.assertEqual(lookup.meta_map, {})
+            self.assertEqual(lookup.bom_map, {})
+        finally:
+            for name, original in originals.items():
+                setattr(self.module, name, original)
 
 
 if __name__ == "__main__":

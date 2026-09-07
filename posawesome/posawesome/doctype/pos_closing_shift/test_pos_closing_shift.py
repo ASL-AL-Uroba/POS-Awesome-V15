@@ -133,6 +133,85 @@ class TestPOSClosingShift(unittest.TestCase):
 
         payment_doc.check_permission.assert_called_once_with("read")
 
+    @patch("posawesome.posawesome.doctype.pos_closing_shift.closing_processing.overview.frappe")
+    def test_reconciliation_print_uses_original_tender_currency(self, mock_frappe):
+        invoice_doc = self._make_doc(
+            {
+                "currency": "USD",
+                "conversion_rate": 285,
+                "grand_total": 0.42,
+                "net_total": 0.42,
+                "payments": [
+                    AttrDict(
+                        {
+                            "mode_of_payment": "Cash",
+                            "posa_payment_currency": "PKR",
+                            "posa_original_amount": 20,
+                            "amount": 0.07,
+                            "base_amount": 20,
+                        }
+                    ),
+                    AttrDict(
+                        {
+                            "mode_of_payment": "Online Transfer",
+                            "posa_payment_currency": "USD",
+                            "posa_original_amount": 0.35,
+                            "amount": 0.35,
+                            "base_amount": 99.75,
+                        }
+                    ),
+                ],
+                "change_amount": 0,
+            }
+        )
+        closing_shift_doc = DummyClosingShift(
+            tables={
+                "pos_transactions": [{"sales_invoice": "SINV-0001"}],
+                "pos_payments": [],
+                "payment_reconciliation": [
+                    AttrDict(
+                        {
+                            "mode_of_payment": "Cash",
+                            "currency": "PKR",
+                            "opening_amount": 0,
+                            "expected_amount": 20,
+                            "difference": 0,
+                        }
+                    ),
+                    AttrDict(
+                        {
+                            "mode_of_payment": "Online Transfer",
+                            "currency": "USD",
+                            "opening_amount": 0,
+                            "expected_amount": 99.75,
+                            "difference": 0,
+                        }
+                    ),
+                ],
+            },
+            company="My Co",
+        )
+
+        mock_frappe.get_cached_value.return_value = "PKR"
+        mock_frappe.db.get_value.return_value = "Cash"
+        mock_frappe.db.exists.return_value = True
+        mock_frappe.get_cached_doc.return_value = invoice_doc
+        mock_frappe._dict.side_effect = lambda d: AttrDict(d)
+        mock_frappe.render_template.return_value = "<html/>"
+
+        overview.get_payment_reconciliation_details(closing_shift_doc)
+
+        context = mock_frappe.render_template.call_args.args[1]
+        summaries = {
+            (row["mode_of_payment"], row["currency_breakdown"][0]["currency"]): row
+            for row in context["mode_summaries"]
+        }
+        self.assertEqual(summaries[("Cash", "PKR")]["currency_breakdown"][0]["amount"], 20)
+        self.assertEqual(
+            summaries[("Online Transfer", "USD")]["currency_breakdown"][0]["amount"],
+            0.35,
+        )
+
     @patch("posawesome.posawesome.doctype.pos_closing_shift.closing_processing.creation.frappe")
     def test_supplier_payment_reference_does_not_populate_customer_link(self, mock_frappe):
         mock_frappe._dict.side_effect = lambda value: AttrDict(value)
@@ -213,6 +292,7 @@ class TestPOSClosingShift(unittest.TestCase):
         )
         regular_invoice = DummyInvoiceDoc("SINV-0002")
 
+        mock_frappe._dict = lambda d: SimpleNamespace(**d)
         mock_frappe.get_all.return_value = [
             SimpleNamespace(name="SINV-RET-0001"),
             SimpleNamespace(name="SINV-0002"),

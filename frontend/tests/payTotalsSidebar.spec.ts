@@ -2,7 +2,7 @@
 
 import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../src/posapp/composables/core/useRtl", () => ({
 	useRtl: () => ({
@@ -75,6 +75,43 @@ const VTextFieldStub = defineComponent({
 	},
 });
 
+const VSelectStub = defineComponent({
+	name: "VSelectStub",
+	props: {
+		modelValue: {
+			type: [String, Number],
+			default: "",
+		},
+		items: {
+			type: Array,
+			default: () => [],
+		},
+		label: {
+			type: String,
+			default: "",
+		},
+	},
+	emits: ["update:modelValue"],
+	setup(props, { attrs, emit }) {
+		return () =>
+			h(
+				"select",
+				{
+					value: props.modelValue,
+					"data-test": attrs["data-test"],
+					"aria-label": props.label,
+					onChange: (event: Event) =>
+						emit("update:modelValue", (event.target as HTMLSelectElement).value),
+				},
+				(props.items as Array<any>).map((item) => {
+					const value = typeof item === "object" ? item.value : item;
+					const title = typeof item === "object" ? item.title : item;
+					return h("option", { value }, String(title));
+				}),
+			);
+	},
+});
+
 const VueDatePickerStub = defineComponent({
 	name: "VueDatePickerStub",
 	props: {
@@ -134,6 +171,7 @@ const mountSidebar = (props: Record<string, unknown> = {}) =>
 				VCol: BoxStub,
 				VDivider: BoxStub,
 				VTextField: VTextFieldStub,
+				VSelect: VSelectStub,
 				VBtn: BoxStub,
 				VIcon: BoxStub,
 				VSwitch: VSwitchStub,
@@ -150,6 +188,10 @@ const mountSidebar = (props: Record<string, unknown> = {}) =>
 	});
 
 describe("PayTotalsSidebar", () => {
+	beforeEach(() => {
+		(globalThis as any).__ = (value: string) => value;
+	});
+
 	it("shows the auto allocate toggle enabled by default with english helper text", () => {
 		const wrapper = mountSidebar();
 
@@ -170,5 +212,44 @@ describe("PayTotalsSidebar", () => {
 		).updateReferenceDate("03-04-2026");
 
 		expect(normalized).toBe("2026-04-03");
+	});
+
+	it("offers every allowed tender currency even when the payment account uses one currency", async () => {
+		const payment = {
+			mode_of_payment: "Cash",
+			amount: 0,
+			row_id: "MOP-CASH",
+			payment_currency: "PKR",
+			bank_account: "Cash PKR - TC",
+		};
+		const wrapper = mountSidebar({
+			posProfile: {
+				posa_allow_make_new_payments: 1,
+			},
+			paymentMethods: [payment],
+			filteredPaymentMethods: [payment],
+			allowPaymentCurrencySelection: true,
+			allowedPaymentCurrencies: ["PKR", "USD"],
+			availableBankAccounts: {
+				Cash: [
+					{
+						account: "Cash PKR - TC",
+						account_currency: "PKR",
+						account_type: "Cash",
+					},
+				],
+			},
+			getPaymentMethodCurrency: () => "PKR",
+		});
+
+		await wrapper.get('select[aria-label="Mode of Payment"]').setValue("Cash");
+
+		const currencySelector = wrapper.get(
+			'select[data-test="payment-tender-currency"]',
+		);
+		expect(currencySelector.findAll("option").map((option) => option.text())).toEqual([
+			"PKR",
+			"USD",
+		]);
 	});
 });

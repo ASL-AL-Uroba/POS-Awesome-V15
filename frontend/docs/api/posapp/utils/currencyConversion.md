@@ -12,7 +12,7 @@
 
 > **getBaseCurrency**(`context`): `string` \| `undefined`
 
-Defined in: [posapp/utils/currencyConversion.ts:27](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/posapp/utils/currencyConversion.ts#L27)
+Defined in: [posapp/utils/currencyConversion.ts:36](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/posapp/utils/currencyConversion.ts#L36)
 
 Gets the base currency from the context.
 
@@ -32,7 +32,7 @@ Gets the base currency from the context.
 
 > **getCompanyCurrency**(`context`): `string` \| `undefined`
 
-Defined in: [posapp/utils/currencyConversion.ts:20](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/posapp/utils/currencyConversion.ts#L20)
+Defined in: [posapp/utils/currencyConversion.ts:29](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/posapp/utils/currencyConversion.ts#L29)
 
 Gets the company currency from the context.
 
@@ -52,7 +52,7 @@ Gets the company currency from the context.
 
 > **isCompanyCurrencySelected**(`context`): `boolean`
 
-Defined in: [posapp/utils/currencyConversion.ts:33](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/posapp/utils/currencyConversion.ts#L33)
+Defined in: [posapp/utils/currencyConversion.ts:42](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/posapp/utils/currencyConversion.ts#L42)
 
 Checks if the company currency is currently selected.
 
@@ -72,7 +72,7 @@ Checks if the company currency is currently selected.
 
 > **toBaseCurrency**(`context`, `amount`): `number` \| `null` \| `undefined`
 
-Defined in: [posapp/utils/currencyConversion.ts:39](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/posapp/utils/currencyConversion.ts#L39)
+Defined in: [posapp/utils/currencyConversion.ts:48](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/posapp/utils/currencyConversion.ts#L48)
 
 Converts an amount to the base currency.
 
@@ -96,7 +96,7 @@ Converts an amount to the base currency.
 
 > **toSelectedCurrency**(`context`, `amount`): `number` \| `null` \| `undefined`
 
-Defined in: [posapp/utils/currencyConversion.ts:53](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/posapp/utils/currencyConversion.ts#L53)
+Defined in: [posapp/utils/currencyConversion.ts:61](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/posapp/utils/currencyConversion.ts#L61)
 
 Converts an amount to the selected currency.
 
@@ -118,29 +118,39 @@ Converts an amount to the selected currency.
 
 ### CurrencyContext
 
-Defined in: [posapp/utils/currencyConversion.ts:6](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/posapp/utils/currencyConversion.ts#L6)
+Defined in: [posapp/utils/currencyConversion.ts:12](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/posapp/utils/currencyConversion.ts#L12)
 
 Interface for the context required by currency conversion functions.
 
 #### Properties
 
+##### company?
+
+> `optional` **company?**: `object`
+
+Defined in: [posapp/utils/currencyConversion.ts:13](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/posapp/utils/currencyConversion.ts#L13)
+
+###### default\_currency?
+
+> `optional` **default\_currency?**: `string`
+
 ##### conversion\_rate?
 
 > `optional` **conversion\_rate?**: `number`
 
-Defined in: [posapp/utils/currencyConversion.ts:12](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/posapp/utils/currencyConversion.ts#L12)
+Defined in: [posapp/utils/currencyConversion.ts:21](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/posapp/utils/currencyConversion.ts#L21)
 
 ##### currency\_precision?
 
 > `optional` **currency\_precision?**: `number`
 
-Defined in: [posapp/utils/currencyConversion.ts:13](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/posapp/utils/currencyConversion.ts#L13)
+Defined in: [posapp/utils/currencyConversion.ts:22](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/posapp/utils/currencyConversion.ts#L22)
 
 ##### flt
 
 > **flt**: (`_value`, `_precision?`) => `number`
 
-Defined in: [posapp/utils/currencyConversion.ts:14](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/posapp/utils/currencyConversion.ts#L14)
+Defined in: [posapp/utils/currencyConversion.ts:23](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/posapp/utils/currencyConversion.ts#L23)
 
 ###### Parameters
 
@@ -160,7 +170,7 @@ Defined in: [posapp/utils/currencyConversion.ts:14](https://github.com/ASL-AL-Ur
 
 > `optional` **pos\_profile?**: `object`
 
-Defined in: [posapp/utils/currencyConversion.ts:7](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/posapp/utils/currencyConversion.ts#L7)
+Defined in: [posapp/utils/currencyConversion.ts:16](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/posapp/utils/currencyConversion.ts#L16)
 
 ###### currency?
 
@@ -170,10 +180,10 @@ Defined in: [posapp/utils/currencyConversion.ts:7](https://github.com/ASL-AL-Uro
 
 > `optional` **price\_list\_currency?**: `string`
 
-Defined in: [posapp/utils/currencyConversion.ts:10](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/posapp/utils/currencyConversion.ts#L10)
+Defined in: [posapp/utils/currencyConversion.ts:19](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/posapp/utils/currencyConversion.ts#L19)
 
 ##### selected\_currency?
 
 > `optional` **selected\_currency?**: `string`
 
-Defined in: [posapp/utils/currencyConversion.ts:11](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/posapp/utils/currencyConversion.ts#L11)
+Defined in: [posapp/utils/currencyConversion.ts:20](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/posapp/utils/currencyConversion.ts#L20)

@@ -5,7 +5,9 @@
 
 import frappe
 import time
-from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
+from frappe.utils import cint, flt
+from posawesome.posawesome.api.erpnext_compat import resolve_make_sales_invoice_from_order
+from posawesome.posawesome.api.tax_contracts import apply_pos_tax_inclusion_contract
 from posawesome.posawesome.api.invoice_processing.utils import (
     _get_return_validity_settings,
     _build_invoice_remarks,
@@ -40,6 +42,12 @@ from posawesome.posawesome.api.invoice_processing.returns import (
 from posawesome.posawesome.api.invoice_processing.payment import _create_change_payment_entries
 from posawesome.posawesome.api.invoice_processing.data import get_last_invoice_rates
 from posawesome.posawesome.api.utils import log_perf_event
+from posawesome.posawesome.api.submitted_invoice_edits import (
+    get_submitted_invoice_for_edit,
+    list_submitted_invoices,
+    preview_submitted_invoice_edit,
+    submit_submitted_invoice_edit,
+)
 
 
 @frappe.whitelist()
@@ -75,21 +83,25 @@ def get_draft_invoices(
     if frappe.db.has_column(doctype, "posa_is_printed"):
         filters["posa_is_printed"] = 0
 
+    fields = [
+        "name",
+        "customer",
+        "customer_name",
+        "posting_date",
+        "posting_time",
+        "grand_total",
+        "currency",
+        "pos_profile",
+        "owner",
+        "modified_by",
+    ]
+    if frappe.db.has_column(doctype, "posa_cashier"):
+        fields.append("posa_cashier")
+
     invoices_list = frappe.get_list(
         doctype,
         filters=filters,
-        fields=[
-            "name",
-            "customer",
-            "customer_name",
-            "posting_date",
-            "posting_time",
-            "grand_total",
-            "currency",
-            "pos_profile",
-            "owner",
-            "modified_by",
-        ],
+        fields=fields,
         limit_page_length=limit_page_length,
         order_by="modified desc",
     )
@@ -140,7 +152,7 @@ def delete_invoice(invoice):
 
 
 @frappe.whitelist()
-def fetch_exchange_rate_pair(from_currency, to_currency):
+def fetch_exchange_rate_pair(from_currency, to_currency, transaction_date=None):
     """Return exchange rate payload expected by POS multi-currency UI."""
 
     if not from_currency or not to_currency:
@@ -151,13 +163,54 @@ def fetch_exchange_rate_pair(from_currency, to_currency):
 
         return {
             "exchange_rate": 1,
-            "date": nowdate(),
+            "date": transaction_date or nowdate(),
         }
 
-    exchange_rate, rate_date = get_latest_rate(from_currency, to_currency)
+    exchange_rate, rate_date = get_latest_rate(
+        from_currency,
+        to_currency,
+        transaction_date=transaction_date,
+        silent=True,
+    )
     return {
         "exchange_rate": exchange_rate,
         "date": rate_date,
+    }
+
+
+@frappe.whitelist()
+def resolve_exchange_rate(
+    from_currency,
+    to_currency,
+    transaction_date=None,
+    purpose=None,
+    allow_external=1,
+):
+    """Resolve one explicitly requested pair without emitting desk dialogs."""
+
+    if not from_currency or not to_currency:
+        return {
+            "found": False,
+            "from_currency": from_currency,
+            "to_currency": to_currency,
+            "error": "from_currency and to_currency are required",
+        }
+
+    rate, rate_date = get_latest_rate(
+        from_currency,
+        to_currency,
+        transaction_date=transaction_date,
+        purpose=purpose,
+        allow_external=cint(allow_external),
+        silent=True,
+    )
+    return {
+        "found": bool(rate and flt(rate) > 0),
+        "from_currency": from_currency,
+        "to_currency": to_currency,
+        "exchange_rate": flt(rate) if rate else None,
+        "date": rate_date,
+        "source": "same_currency" if from_currency == to_currency else "currency_exchange",
     }
 
 
@@ -171,9 +224,11 @@ def create_sales_invoice_from_order(sales_order):
     if not frappe.db.exists("Sales Order", sales_order):
         frappe.throw(f"Sales Order {sales_order} does not exist")
 
-    invoice_doc = make_sales_invoice(sales_order)
+    sales_order_doc = frappe.get_doc("Sales Order", sales_order)
+    invoice_doc = resolve_make_sales_invoice_from_order()(sales_order)
     invoice_doc.flags.ignore_permissions = True
     invoice_doc.run_method("set_missing_values")
+    apply_pos_tax_inclusion_contract(invoice_doc, source_doc=sales_order_doc, recalculate=False)
     invoice_doc.run_method("calculate_taxes_and_totals")
     return invoice_doc
 

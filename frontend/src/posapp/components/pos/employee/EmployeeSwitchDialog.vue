@@ -22,7 +22,50 @@
 				<div class="employee-switch-dialog__copy">
 					{{ __("Choose the cashier currently operating this terminal.") }}
 				</div>
-				<div v-if="!terminalEmployees.length" class="employee-switch-dialog__empty">
+				<v-alert
+					v-if="cashiersRefreshFailed"
+					variant="tonal"
+					type="warning"
+					density="compact"
+					class="employee-switch-dialog__load-error"
+					data-test="cashier-list-refresh-error"
+				>
+					<div>{{ terminalEmployeesLoadError }}</div>
+					<button type="button" class="employee-switch-dialog__retry" @click="retryCashierLoad">
+						{{ __("Retry") }}
+					</button>
+				</v-alert>
+				<div
+					v-if="cashiersLoading"
+					class="employee-switch-dialog__status"
+					data-test="cashier-list-loading"
+				>
+					<v-progress-circular indeterminate color="primary" size="24" width="3" />
+					<span>{{ __("Loading authorized cashiers...") }}</span>
+				</div>
+				<v-alert
+					v-else-if="cashiersLoadFailed"
+					variant="tonal"
+					type="error"
+					density="comfortable"
+					class="employee-switch-dialog__load-error"
+					data-test="cashier-list-error"
+				>
+					<div>{{ terminalEmployeesLoadError }}</div>
+					<button
+						type="button"
+						class="employee-switch-dialog__retry"
+						data-test="cashier-list-retry"
+						@click="retryCashierLoad"
+					>
+						{{ __("Retry") }}
+					</button>
+				</v-alert>
+				<div
+					v-else-if="!terminalEmployees.length"
+					class="employee-switch-dialog__empty"
+					data-test="cashier-list-empty"
+				>
 					{{ __("No cashier profiles are available for this POS profile yet.") }}
 				</div>
 				<div v-else class="employee-switch-dialog__list">
@@ -46,31 +89,40 @@
 						/>
 					</button>
 				</div>
-				<v-alert
-					variant="tonal"
-					type="info"
-					density="comfortable"
-					class="employee-switch-dialog__help"
-					data-test="cashier-pin-help"
-				>
-					{{
-						__(
-							"Set each cashier PIN in the User form and keep terminal members assigned in POS Profile User.",
-						)
-					}}
-				</v-alert>
-				<v-text-field
-					v-model="cashierPin"
-					:type="showPin ? 'text' : 'password'"
-					:append-inner-icon="showPin ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
-					variant="outlined"
-					density="comfortable"
-					hide-details="auto"
-					:label="__('Cashier PIN')"
-					:data-test="'cashier-pin-input'"
-					@click:append-inner="showPin = !showPin"
-					@keyup.enter="submitSwitch"
-				/>
+				<template v-if="terminalEmployees.length">
+					<v-alert
+						variant="tonal"
+						type="info"
+						density="comfortable"
+						class="employee-switch-dialog__help"
+						data-test="cashier-pin-help"
+					>
+						{{
+							__(
+								"Set each cashier PIN in the User form and keep terminal members assigned in POS Profile User.",
+							)
+						}}
+					</v-alert>
+					<v-text-field
+						v-model="cashierPin"
+						:type="showPin ? 'text' : 'password'"
+						name="pos-cashier-switch-pin"
+						autocomplete="one-time-code"
+						inputmode="numeric"
+						pattern="[0-9]*"
+						data-1p-ignore="true"
+						data-lpignore="true"
+						data-bwignore="true"
+						:append-inner-icon="showPin ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+						variant="outlined"
+						density="comfortable"
+						hide-details="auto"
+						:label="__('Cashier PIN')"
+						:data-test="'cashier-pin-input'"
+						@click:append-inner="showPin = !showPin"
+						@keyup.enter="submitSwitch"
+					/>
+				</template>
 				<v-alert
 					v-if="pinError"
 					variant="tonal"
@@ -100,7 +152,7 @@
 	</v-dialog>
 
 	<v-dialog :model-value="lockDialogOpen" max-width="480" persistent>
-		<v-card class="pos-themed-card employee-lock-dialog">
+		<v-card class="pos-themed-card employee-lock-dialog" data-test="terminal-lock-dialog">
 			<v-card-title class="employee-switch-dialog__title">
 				<div>
 					<div class="employee-switch-dialog__eyebrow">{{ __("Terminal locked") }}</div>
@@ -111,12 +163,59 @@
 				<div class="employee-switch-dialog__copy">
 					{{ __("Select the cashier who is taking over this terminal.") }}
 				</div>
-				<div class="employee-switch-dialog__list">
+				<v-alert
+					v-if="cashiersRefreshFailed"
+					variant="tonal"
+					type="warning"
+					density="compact"
+					class="employee-switch-dialog__load-error"
+					data-test="terminal-cashier-refresh-error"
+				>
+					<div>{{ terminalEmployeesLoadError }}</div>
+					<button type="button" class="employee-switch-dialog__retry" @click="retryCashierLoad">
+						{{ __("Retry") }}
+					</button>
+				</v-alert>
+				<div
+					v-if="cashiersLoading"
+					class="employee-switch-dialog__status"
+					data-test="terminal-cashier-loading"
+				>
+					<v-progress-circular indeterminate color="primary" size="24" width="3" />
+					<span>{{ __("Loading authorized cashiers...") }}</span>
+				</div>
+				<v-alert
+					v-else-if="cashiersLoadFailed"
+					variant="tonal"
+					type="error"
+					density="comfortable"
+					class="employee-switch-dialog__load-error"
+					data-test="terminal-cashier-error"
+				>
+					<div>{{ terminalEmployeesLoadError }}</div>
+					<button
+						type="button"
+						class="employee-switch-dialog__retry"
+						data-test="terminal-cashier-retry"
+						@click="retryCashierLoad"
+					>
+						{{ __("Retry") }}
+					</button>
+				</v-alert>
+				<div
+					v-else-if="!terminalEmployees.length"
+					class="employee-switch-dialog__empty"
+					data-test="terminal-cashier-empty"
+				>
+					{{ __("No enabled cashiers are assigned to this POS profile.") }}
+				</div>
+				<div v-else class="employee-switch-dialog__list">
 					<button
 						v-for="employee in terminalEmployees"
 						:key="`unlock-${employee.user}`"
 						type="button"
 						class="employee-switch-dialog__option"
+						:data-test="`terminal-unlock-cashier-${employee.user}`"
 						:class="{ 'employee-switch-dialog__option--active': selectedUser === employee.user }"
 						@click="selectEmployee(employee.user)"
 					>
@@ -127,29 +226,40 @@
 						<v-icon icon="mdi-lock-open-outline" color="primary" />
 					</button>
 				</div>
-				<v-alert
-					variant="tonal"
-					type="info"
-					density="comfortable"
-					class="employee-switch-dialog__help"
-				>
-					{{
-						__(
-							"Set each cashier PIN in the User form and keep terminal members assigned in POS Profile User.",
-						)
-					}}
-				</v-alert>
-				<v-text-field
-					v-model="cashierPin"
-					:type="showPin ? 'text' : 'password'"
-					:append-inner-icon="showPin ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
-					variant="outlined"
-					density="comfortable"
-					hide-details="auto"
-					:label="__('Cashier PIN')"
-					@click:append-inner="showPin = !showPin"
-					@keyup.enter="submitUnlock"
-				/>
+				<template v-if="terminalEmployees.length">
+					<v-alert
+						variant="tonal"
+						type="info"
+						density="comfortable"
+						class="employee-switch-dialog__help"
+					>
+						{{
+							__(
+								"Set each cashier PIN in the User form and keep terminal members assigned in POS Profile User.",
+							)
+						}}
+					</v-alert>
+					<v-text-field
+						v-model="cashierPin"
+						:type="showPin ? 'text' : 'password'"
+						name="pos-terminal-unlock-pin"
+						autocomplete="one-time-code"
+						inputmode="numeric"
+						pattern="[0-9]*"
+						data-1p-ignore="true"
+						data-lpignore="true"
+						data-bwignore="true"
+						:append-inner-icon="showPin ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+						variant="outlined"
+						density="comfortable"
+						hide-details="auto"
+						:label="__('Cashier PIN')"
+						data-test="terminal-unlock-pin"
+						autofocus
+						@click:append-inner="showPin = !showPin"
+						@keyup.enter="submitUnlock"
+					/>
+				</template>
 				<v-alert
 					v-if="pinError"
 					variant="tonal"
@@ -161,6 +271,15 @@
 				</v-alert>
 			</v-card-text>
 			<v-card-actions class="employee-switch-dialog__actions">
+				<v-btn
+					v-if="invoiceUnlockPending"
+					variant="text"
+					data-test="terminal-unlock-cancel"
+					:disabled="isSubmitting"
+					@click="employeeStore.cancelPendingInvoiceSubmission()"
+				>
+					{{ __("Cancel invoice submission") }}
+				</v-btn>
 				<v-btn color="primary" :disabled="!canSubmit" :loading="isSubmitting" @click="submitUnlock">
 					{{ __("Unlock POS") }}
 				</v-btn>
@@ -177,7 +296,16 @@ import { useUIStore } from "../../../stores/uiStore";
 
 const employeeStore = useEmployeeStore();
 const uiStore = useUIStore();
-const { terminalEmployees, currentCashier, switchDialogOpen, lockDialogOpen } = storeToRefs(employeeStore);
+const emit = defineEmits(["retry-load"]);
+const {
+	terminalEmployees,
+	currentCashier,
+	switchDialogOpen,
+	lockDialogOpen,
+	terminalEmployeesLoadStatus,
+	terminalEmployeesLoadError,
+	invoiceUnlockPending,
+} = storeToRefs(employeeStore);
 const selectedUser = ref("");
 const cashierPin = ref("");
 const pinError = ref("");
@@ -186,12 +314,46 @@ const showPin = ref(false);
 const posProfileName = computed(
 	() => uiStore.posProfile?.name || window.frappe?.boot?.pos_profile?.name || "",
 );
+const cashiersLoading = computed(
+	() =>
+		!terminalEmployees.value.length &&
+		(terminalEmployeesLoadStatus.value === "idle" ||
+			terminalEmployeesLoadStatus.value === "loading"),
+);
+const cashiersLoadFailed = computed(
+	() => terminalEmployeesLoadStatus.value === "error" && !terminalEmployees.value.length,
+);
+const cashiersRefreshFailed = computed(
+	() => terminalEmployeesLoadStatus.value === "error" && terminalEmployees.value.length > 0,
+);
+
+const resolveDefaultCashierUser = (cashier) => {
+	const current = terminalEmployees.value.find((employee) => employee.user === cashier?.user);
+	return current?.user || terminalEmployees.value[0]?.user || "";
+};
 
 watch(
 	[currentCashier, switchDialogOpen, lockDialogOpen, terminalEmployees],
-	([cashier, switchOpen, lockOpen]) => {
-		if (switchOpen || lockOpen) {
-			selectedUser.value = cashier?.user || terminalEmployees.value[0]?.user || "";
+	([cashier, switchOpen, lockOpen], previousValues = []) => {
+		const [, previousSwitchOpen, previousLockOpen] = previousValues;
+		const dialogOpen = switchOpen || lockOpen;
+		const previouslyOpen = previousSwitchOpen || previousLockOpen;
+		if (dialogOpen && !previouslyOpen) {
+			selectedUser.value = resolveDefaultCashierUser(cashier);
+			cashierPin.value = "";
+			pinError.value = "";
+			showPin.value = false;
+			return;
+		}
+		if (
+			dialogOpen &&
+			(!selectedUser.value ||
+				!terminalEmployees.value.some((employee) => employee.user === selectedUser.value))
+		) {
+			selectedUser.value = resolveDefaultCashierUser(cashier);
+			return;
+		}
+		if (!dialogOpen) {
 			cashierPin.value = "";
 			pinError.value = "";
 			showPin.value = false;
@@ -213,7 +375,19 @@ const normalizeErrorMessage = (error) =>
 
 const selectEmployee = (user) => {
 	selectedUser.value = user;
+	cashierPin.value = "";
 	pinError.value = "";
+};
+
+const retryCashierLoad = () => {
+	selectedUser.value = "";
+	cashierPin.value = "";
+	pinError.value = "";
+	const profileName = employeeStore.terminalEmployeesProfile || posProfileName.value;
+	if (profileName) {
+		employeeStore.beginTerminalEmployeesLoad(profileName);
+	}
+	emit("retry-load");
 };
 
 const handleSwitchDialog = (value) => {
@@ -244,10 +418,15 @@ const verifySelection = async () => {
 				pin: cashierPin.value.trim(),
 			},
 		});
-		return {
+		const verifiedCashier = {
 			...selectedCashier.value,
 			...(response?.message || {}),
 		};
+		const terminalState = verifiedCashier.terminal_state;
+		if (terminalState?.locked !== false || terminalState?.active_cashier !== verifiedCashier.user) {
+			throw new Error(__("The server did not confirm the active terminal cashier."));
+		}
+		return verifiedCashier;
 	} catch (error) {
 		pinError.value = normalizeErrorMessage(error);
 		return null;
@@ -261,7 +440,7 @@ const submitSwitch = async () => {
 	if (!verifiedCashier) {
 		return;
 	}
-	employeeStore.setCurrentCashier(verifiedCashier);
+	employeeStore.applyVerifiedCashier(verifiedCashier);
 	employeeStore.closeEmployeeSwitch();
 	cashierPin.value = "";
 };
@@ -274,6 +453,32 @@ const submitUnlock = async () => {
 	employeeStore.unlockTerminal(verifiedCashier);
 	cashierPin.value = "";
 };
+
+watch(cashierPin, (value) => {
+	const normalizedPin = String(value || "")
+		.replace(/\D/g, "")
+		.slice(0, 8);
+	if (normalizedPin !== value) {
+		cashierPin.value = normalizedPin;
+		return;
+	}
+
+	const expectedLength = Number(selectedCashier.value?.pin_length || 0);
+	if (
+		isSubmitting.value ||
+		expectedLength < 4 ||
+		expectedLength > 8 ||
+		normalizedPin.length !== expectedLength
+	) {
+		return;
+	}
+
+	if (lockDialogOpen.value) {
+		void submitUnlock();
+	} else if (switchDialogOpen.value) {
+		void submitSwitch();
+	}
+});
 
 const __ = window.__;
 </script>
@@ -304,6 +509,42 @@ const __ = window.__;
 	border: 1px dashed var(--pos-border);
 	border-radius: 14px;
 	color: var(--pos-text-secondary);
+}
+
+.employee-switch-dialog__status {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-height: 64px;
+	padding: 14px 16px;
+	border: 1px solid var(--pos-border);
+	border-radius: 14px;
+	background: var(--pos-surface-muted);
+	color: var(--pos-text-secondary);
+}
+
+.employee-switch-dialog__load-error :deep(.v-alert__content) {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.employee-switch-dialog__retry {
+	flex: 0 0 auto;
+	padding: 6px 10px;
+	border: 1px solid currentColor;
+	border-radius: 6px;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.employee-switch-dialog__retry:focus-visible {
+	outline: 2px solid currentColor;
+	outline-offset: 2px;
 }
 
 .employee-switch-dialog__list {

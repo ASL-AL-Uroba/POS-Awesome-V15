@@ -136,6 +136,66 @@ describe("usePosPaySubmission", () => {
 		});
 	});
 
+	it("preserves per-entry tender currency metadata in the payment payload", async () => {
+		let submittedPayload: any = null;
+		(globalThis as any).frappe.call.mockImplementation(({ args, callback }: any) => {
+			submittedPayload = args.payload;
+			callback({ message: { new_payments_entry: [{ name: "ACC-PAY-0006" }] } });
+		});
+
+		const { processPayment } = usePosPaySubmission({
+			customerName: ref("Customer 727"),
+			company: ref("Test Company"),
+			posProfile: ref({ name: "Main POS" }),
+			posOpeningShift: ref({ name: "POS-OPEN-0001" }),
+			exchangeRate: ref(285),
+			invoiceTotalCurrency: ref("USD"),
+			referenceNo: ref(""),
+			referenceDate: ref(""),
+			autoAllocatePaymentAmount: ref(false),
+			payment_methods: ref([
+				{
+					mode_of_payment: "Cash",
+					amount: 29.93,
+					payment_currency: "PKR",
+					invoice_equivalent: 0.105,
+					invoice_exchange_rate: 0.003508772,
+					company_exchange_rate: 1,
+					rate_date: "2026-08-21",
+					rate_source: "currency_exchange",
+					bank_account: "Cash PKR - TC",
+				},
+			]),
+			selected_invoices: ref([]),
+			selected_payments: ref([]),
+			selected_mpesa_payments: ref([]),
+			total_selected_payments: ref(0),
+			total_selected_mpesa_payments: ref(0),
+			total_payment_methods: ref(0.105),
+			clearSelections: vi.fn(),
+			resetPaymentMethodAmounts: vi.fn(),
+			load_print_page: vi.fn(),
+			eventBus: { emit: vi.fn() },
+			get_outstanding_invoices: vi.fn(),
+			get_unallocated_payments: vi.fn(),
+			get_draft_mpesa_payments_register: vi.fn(),
+			set_mpesa_search_params: vi.fn(),
+			autoReconcile: vi.fn(),
+		});
+
+		await processPayment();
+
+		expect(submittedPayload.payment_methods[0]).toMatchObject({
+			amount: 29.93,
+			original_amount: 29.93,
+			payment_currency: "PKR",
+			invoice_equivalent: 0.105,
+			invoice_exchange_rate: 0.003508772,
+			exchange_rate: 1,
+			bank_account: "Cash PKR - TC",
+		});
+	});
+
 	it("clears entered payment method amounts after a successful submit", async () => {
 		(globalThis as any).frappe.call.mockImplementation(({ callback }: any) => {
 			callback({

@@ -121,6 +121,7 @@ ORDERED_CHAIN = [
     "posa_show_custom_name_marker_on_print",
     "posa_allow_zero_rated_items",
     "posa_input_qty",
+    "posa_focus_cart_qty_after_item_add",
     "posa_new_line",
     "posa_section_print_delivery",
     "posa_use_delivery_charges",
@@ -131,6 +132,9 @@ ORDERED_CHAIN = [
     "posa_allow_print_draft_invoices",
     "posa_open_print_in_new_tab",
     "posa_silent_print",
+    "posa_qz_printer_name",
+    "posa_raw_printing",
+    "posa_raw_print_width",
     "posa_print_format_rules",
     "posa_section_cash_movement",
     "posa_enable_cash_movement",
@@ -167,6 +171,9 @@ ORDERED_CHAIN = [
     "posa_force_server_items",
     "posa_use_server_cache",
     "posa_server_cache_duration",
+    "posa_fast_counter_mode",
+    "posa_hot_catalog_limit",
+    "posa_fast_counter_positive_stock_only",
     "posa_force_reload_items",
     "posa_smart_reload_mode",
     "column_break_anyol",
@@ -226,6 +233,10 @@ def _reanchor_fields():
     for fieldname in ORDERED_CHAIN:
         cf_name = f"POS Profile-{fieldname}"
         if not frappe.db.exists("Custom Field", cf_name):
+            continue
+        if fieldname == "posa_section_print_delivery":
+            _set_insert_after(fieldname, "select_print_heading")
+            previous = fieldname
             continue
         if previous and previous != fieldname:
             _set_insert_after(fieldname, previous)

@@ -32,7 +32,6 @@ declare const frappe: any;
 declare const __: any;
 import type {
 	CartItem,
-	InvoiceDoc,
 	InvoiceDocRef,
 	InvoiceMetadata,
 	DeliveryCharge,
@@ -70,10 +69,16 @@ const getItemTotals = (item: any) => {
 	const qty = toNumber(item?.qty);
 	const rate = toNumber(item?.rate);
 	const disc = toNumber(item?.discount_amount || 0);
+	const lineAmount = toNumber(item?.amount);
+	const hasLineAmount =
+		item?.amount !== undefined &&
+		item?.amount !== null &&
+		item?.amount !== "" &&
+		Number.isFinite(lineAmount);
 
 	return {
 		qty,
-		gross: qty * rate,
+		gross: hasLineAmount ? lineAmount : qty * rate,
 		discount: Math.abs(qty * disc),
 	};
 };
@@ -128,9 +133,16 @@ export const useInvoiceStore = defineStore("invoice", () => {
 			const qty = toNumber(item.qty);
 			const rate = toNumber(item.rate);
 			const disc = toNumber(item.discount_amount || 0);
+			const rawLineAmount = item.amount as unknown;
+			const lineAmount = toNumber(rawLineAmount);
+			const hasLineAmount =
+				rawLineAmount !== undefined &&
+				rawLineAmount !== null &&
+				rawLineAmount !== "" &&
+				Number.isFinite(lineAmount);
 
 			tQty += qty;
-			tGross += qty * rate;
+			tGross += hasLineAmount ? lineAmount : qty * rate;
 			tDisc += Math.abs(qty * disc);
 		}
 
@@ -524,6 +536,17 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		return item;
 	};
 
+	/** Moves an existing row to the top without changing item data or totals. */
+	const moveRowToTop = (rowId: string) => {
+		if (!rowId) return;
+		const idx = itemOrder.value.indexOf(rowId);
+		if (idx > 0) {
+			itemOrder.value.splice(idx, 1);
+			itemOrder.value.unshift(rowId);
+			touch();
+		}
+	};
+
 	/**
 	 * Removes the item identified by `rowId` from both `itemsData` and `itemOrder`,
 	 * then recalculates totals immediately.
@@ -670,6 +693,7 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		upsertItem,
 		updateItemWithTotals,
 		triggerUpdateTotals,
+		moveRowToTop,
 		removeItemByRowId,
 		clearItems,
 		setPackedItems,

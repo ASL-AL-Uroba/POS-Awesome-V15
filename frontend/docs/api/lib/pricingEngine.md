@@ -21,7 +21,7 @@ for unit testing but are not part of the public API contract — they may change
 
 > **applyLocalPricingRules**(`params`): `object`
 
-Defined in: [lib/pricingEngine.ts:668](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/lib/pricingEngine.ts#L668)
+Defined in: [lib/pricingEngine.ts:768](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L768)
 
 #### Parameters
 
@@ -31,9 +31,17 @@ Defined in: [lib/pricingEngine.ts:668](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 `number`
 
+###### cartAmount?
+
+`string` \| `number`
+
 ###### ctx?
 
 `AnyRecord`
+
+###### docAmount?
+
+`string` \| `number`
 
 ###### docQty?
 
@@ -41,23 +49,7 @@ Defined in: [lib/pricingEngine.ts:668](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 ###### indexes?
 
-\{ `byBrand?`: `Map`\<`string`, `AnyRecord`[]\>; `byGroup?`: `Map`\<`string`, `AnyRecord`[]\>; `byItem?`: `Map`\<`string`, `AnyRecord`[]\>; `general?`: `AnyRecord`[]; \}
-
-###### indexes.byBrand?
-
-`Map`\<`string`, `AnyRecord`[]\>
-
-###### indexes.byGroup?
-
-`Map`\<`string`, `AnyRecord`[]\>
-
-###### indexes.byItem?
-
-`Map`\<`string`, `AnyRecord`[]\>
-
-###### indexes.general?
-
-`AnyRecord`[]
+[`PricingRuleIndexBundle`](#pricingruleindexbundle)
 
 ###### item
 
@@ -89,7 +81,7 @@ Defined in: [lib/pricingEngine.ts:668](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **collectCandidates**(`item?`, `indexBundle?`): `AnyRecord`[]
 
-Defined in: [lib/pricingEngine.ts:155](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/lib/pricingEngine.ts#L155)
+Defined in: [lib/pricingEngine.ts:174](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L174)
 
 Collects all pricing-rule candidates applicable to `item` from the pre-built index.
 
@@ -106,23 +98,9 @@ The cart item to match against.
 
 ##### indexBundle?
 
+[`PricingRuleIndexBundle`](#pricingruleindexbundle) = `{}`
+
 Pre-built lookup maps produced by `usePricingRulesStore`.
-
-###### byBrand?
-
-`Map`\<`string`, `AnyRecord`[]\>
-
-###### byGroup?
-
-`Map`\<`string`, `AnyRecord`[]\>
-
-###### byItem?
-
-`Map`\<`string`, `AnyRecord`[]\>
-
-###### general?
-
-`AnyRecord`[]
 
 #### Returns
 
@@ -134,7 +112,7 @@ Pre-built lookup maps produced by `usePricingRulesStore`.
 
 > **computeFreeItems**(`params`): `AnyRecord`[]
 
-Defined in: [lib/pricingEngine.ts:685](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/lib/pricingEngine.ts#L685)
+Defined in: [lib/pricingEngine.ts:782](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L782)
 
 #### Parameters
 
@@ -144,9 +122,17 @@ Defined in: [lib/pricingEngine.ts:685](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 `number`
 
+###### cartAmount?
+
+`string` \| `number`
+
 ###### ctx?
 
 `AnyRecord`
+
+###### docAmount?
+
+`string` \| `number`
 
 ###### docQty?
 
@@ -190,7 +176,7 @@ Defined in: [lib/pricingEngine.ts:685](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **evaluatePricingRules**(`__namedParameters`): `object`
 
-Defined in: [lib/pricingEngine.ts:490](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/lib/pricingEngine.ts#L490)
+Defined in: [lib/pricingEngine.ts:534](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L534)
 
 Evaluates all applicable pricing rules for a single cart item in one pass.
 
@@ -218,33 +204,29 @@ Input fields (all part of the single destructured argument):
 
 `number`
 
+###### cartAmount?
+
+`string` \| `number`
+
 ###### ctx?
 
 `AnyRecord`
+
+###### docAmount?
+
+`string` \| `number`
 
 ###### docQty?
 
 `string` \| `number`
 
+###### evaluationScope?
+
+`"line"` \| `"transaction"` = `"line"`
+
 ###### indexes?
 
-\{ `byBrand?`: `Map`\<`string`, `AnyRecord`[]\>; `byGroup?`: `Map`\<`string`, `AnyRecord`[]\>; `byItem?`: `Map`\<`string`, `AnyRecord`[]\>; `general?`: `AnyRecord`[]; \}
-
-###### indexes.byBrand?
-
-`Map`\<`string`, `AnyRecord`[]\>
-
-###### indexes.byGroup?
-
-`Map`\<`string`, `AnyRecord`[]\>
-
-###### indexes.byItem?
-
-`Map`\<`string`, `AnyRecord`[]\>
-
-###### indexes.general?
-
-`AnyRecord`[]
+[`PricingRuleIndexBundle`](#pricingruleindexbundle)
 
 ###### item
 
@@ -280,11 +262,67 @@ Input fields (all part of the single destructured argument):
 
 ***
 
+### evaluateTransactionPricingRules()
+
+> **evaluateTransactionPricingRules**(`__namedParameters`): `object`
+
+Defined in: [lib/pricingEngine.ts:736](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L736)
+
+Evaluates rules whose ERPNext scope is the whole transaction exactly once.
+Transaction rules are header-level rules: their quantity and amount thresholds
+use cart totals and a fixed discount amount must not be repeated per item/qty.
+
+#### Parameters
+
+##### \_\_namedParameters
+
+###### cartAmount?
+
+`string` \| `number`
+
+###### cartQty?
+
+`string` \| `number`
+
+###### ctx?
+
+`AnyRecord`
+
+###### indexes?
+
+[`PricingRuleIndexBundle`](#pricingruleindexbundle)
+
+#### Returns
+
+`object`
+
+##### freebies
+
+> **freebies**: `AnyRecord`[]
+
+##### pricing
+
+> **pricing**: `object`
+
+###### pricing.applied
+
+> **applied**: `AnyRecord`[]
+
+###### pricing.discountPerUnit
+
+> **discountPerUnit**: `number`
+
+###### pricing.rate
+
+> **rate**: `number`
+
+***
+
 ### inDateRange()
 
 > **inDateRange**(`currentDate`, `start`, `end`): `boolean`
 
-Defined in: [lib/pricingEngine.ts:44](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/lib/pricingEngine.ts#L44)
+Defined in: [lib/pricingEngine.ts:57](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L57)
 
 Returns `true` when `currentDate` falls within the `[start, end]` range.
 A missing `start` or `end` is treated as unbounded. A missing or unparseable
@@ -314,7 +352,7 @@ A missing `start` or `end` is treated as unbounded. A missing or unparseable
 
 > **matchParty**(`rule`, `customer`, `customerGroup`, `territory`): `boolean`
 
-Defined in: [lib/pricingEngine.ts:79](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/lib/pricingEngine.ts#L79)
+Defined in: [lib/pricingEngine.ts:92](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L92)
 
 Returns `true` when the pricing rule's customer/group/territory restrictions are
 satisfied by the current invoice context.
@@ -348,7 +386,7 @@ A rule with no restrictions on a dimension always passes that dimension's check.
 
 > **matchPriceListAndCurrency**(`rule`, `priceList`, `currency`): `boolean`
 
-Defined in: [lib/pricingEngine.ts:110](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/lib/pricingEngine.ts#L110)
+Defined in: [lib/pricingEngine.ts:123](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L123)
 
 #### Parameters
 
@@ -370,11 +408,33 @@ Defined in: [lib/pricingEngine.ts:110](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 ***
 
+### matchUom()
+
+> **matchUom**(`rule`, `item`): `boolean`
+
+Defined in: [lib/pricingEngine.ts:143](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L143)
+
+#### Parameters
+
+##### rule
+
+`AnyRecord`
+
+##### item
+
+`AnyRecord`
+
+#### Returns
+
+`boolean`
+
+***
+
 ### round()
 
 > **round**(`value`, `precision?`): `number`
 
-Defined in: [lib/pricingEngine.ts:27](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/lib/pricingEngine.ts#L27)
+Defined in: [lib/pricingEngine.ts:40](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L40)
 
 Rounds `value` to `precision` decimal places using symmetric (half-up) rounding.
 Non-finite inputs return `0`.
@@ -399,7 +459,7 @@ Non-finite inputs return `0`.
 
 > **ruleSort**(`a`, `b`): `number`
 
-Defined in: [lib/pricingEngine.ts:204](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/lib/pricingEngine.ts#L204)
+Defined in: [lib/pricingEngine.ts:218](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L218)
 
 #### Parameters
 
@@ -414,3 +474,43 @@ Defined in: [lib/pricingEngine.ts:204](https://github.com/ASL-AL-Uroba/POS-Aweso
 #### Returns
 
 `number`
+
+## Type Aliases
+
+### PricingRuleIndexBundle
+
+> **PricingRuleIndexBundle** = `object`
+
+Defined in: [lib/pricingEngine.ts:18](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L18)
+
+#### Properties
+
+##### byBrand?
+
+> `optional` **byBrand?**: `Map`\<`string`, `AnyRecord`[]\>
+
+Defined in: [lib/pricingEngine.ts:21](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L21)
+
+##### byGroup?
+
+> `optional` **byGroup?**: `Map`\<`string`, `AnyRecord`[]\>
+
+Defined in: [lib/pricingEngine.ts:20](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L20)
+
+##### byItem?
+
+> `optional` **byItem?**: `Map`\<`string`, `AnyRecord`[]\>
+
+Defined in: [lib/pricingEngine.ts:19](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L19)
+
+##### general?
+
+> `optional` **general?**: `AnyRecord`[]
+
+Defined in: [lib/pricingEngine.ts:22](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L22)
+
+##### preSorted?
+
+> `optional` **preSorted?**: `boolean`
+
+Defined in: [lib/pricingEngine.ts:23](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/lib/pricingEngine.ts#L23)

@@ -1,3 +1,5 @@
+import { POS_BRAND_NAME } from "../posapp/config/branding";
+
 export const BOOT_RETRY_KEY = "posa_boot_retry_once";
 export const BOOT_CACHE_RECOVERY_KEY = "posa_boot_cache_recovery_once";
 
@@ -161,7 +163,7 @@ function showTerminalFailure(failure: BootFailure) {
 		typeof frappe.msgprint === "function"
 	) {
 		frappe.msgprint({
-			title: "POS Awesome",
+			title: POS_BRAND_NAME,
 			indicator: "red",
 			message: `POS app failed to start (${failure.code}). Automatic cache recovery was attempted. If the problem persists, reload /app/posapp or use the in-app cache clear shortcut.`,
 		});

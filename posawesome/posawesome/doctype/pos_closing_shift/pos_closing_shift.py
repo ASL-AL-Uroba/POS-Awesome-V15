@@ -62,6 +62,17 @@ class POSClosingShift(Document):
         # get default precision for site
         precision = frappe.get_cached_value("System Settings", None, "currency_precision") or 3
         for d in self.payment_reconciliation:
+            expected_currency = flt(d.get("expected_amount_in_currency"), precision)
+            has_currency_closing = d.get("closing_amount_in_currency") not in (None, "")
+            closing_currency = flt(d.get("closing_amount_in_currency"), precision)
+            if d.get("currency") and has_currency_closing:
+                conversion_rate = (
+                    abs(flt(d.expected_amount, precision) / expected_currency)
+                    if expected_currency
+                    else 1
+                )
+                d.closing_amount = flt(closing_currency * conversion_rate, precision)
+                d.difference_in_currency = closing_currency - expected_currency
             d.difference = +flt(d.closing_amount, precision) - flt(d.expected_amount, precision)
 
     def on_submit(self):

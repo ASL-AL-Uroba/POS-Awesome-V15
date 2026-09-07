@@ -721,10 +721,13 @@ function buildPrimaryWarningFromDecision(
 	}
 
 	const top = ranked[0]!;
+	const missingDetail = top.warningCodes?.length
+		? `Missing prerequisites: ${top.warningCodes.join(", ")}.`
+		: "";
 	return {
 		active: true,
 		title: top.label,
-		messages: [top.message, top.action].filter(Boolean),
+		messages: [top.message, missingDetail, top.action].filter(Boolean),
 		severity: top.severity,
 		capabilityId: top.id,
 	};

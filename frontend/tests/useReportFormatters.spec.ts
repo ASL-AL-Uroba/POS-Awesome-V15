@@ -22,6 +22,7 @@ describe("createReportFormatters", () => {
 		const formatters = buildFormatters("PKR");
 
 		expect(formatters.formatMoney(1234.5)).toBe("PKRSYM 1,234.50");
+		expect(formatters.formatMoneyInCurrency(10, "USD")).toBe("USDSYM 10.00");
 	});
 
 	it("falls back to numeric money when no currency symbol is available", () => {

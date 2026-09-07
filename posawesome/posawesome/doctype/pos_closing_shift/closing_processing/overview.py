@@ -77,6 +77,9 @@ def get_closing_shift_overview(pos_opening_shift):
     loyalty_redeemed_points = 0
     loyalty_redeemed_invoice_count = 0
     loyalty_redeemed_totals_by_currency = {}
+    customer_credit_redeemed_company_currency_total = 0
+    customer_credit_redeemed_invoice_count = 0
+    customer_credit_redeemed_totals_by_currency = {}
     cash_movement_count = 0
     cash_movement_company_currency_total = 0
     cash_movement_totals_by_type = {}
@@ -113,6 +116,7 @@ def get_closing_shift_overview(pos_opening_shift):
 
     def resolve_payment_currency(payment_row, invoice_currency):
         for fieldname in (
+            "posa_payment_currency",
             "currency",
             "account_currency",
             "payment_currency",
@@ -304,6 +308,47 @@ def get_closing_shift_overview(pos_opening_shift):
                 if rate:
                     loyalty_entry["exchange_rates"].add(rate)
 
+        customer_credit_amount = flt(invoice.get("posa_redeemed_customer_credit") or 0)
+        if customer_credit_amount > 0:
+            customer_credit_base_amount = flt(
+                get_base_value(
+                    invoice,
+                    "posa_redeemed_customer_credit",
+                    "base_posa_redeemed_customer_credit",
+                    conversion_rate,
+                )
+            )
+
+            customer_credit_redeemed_company_currency_total += customer_credit_base_amount
+            customer_credit_redeemed_invoice_count += 1
+
+            customer_credit_entry = customer_credit_redeemed_totals_by_currency.setdefault(
+                invoice_currency,
+                {
+                    "currency": invoice_currency,
+                    "total": 0,
+                    "company_currency_total": 0,
+                    "invoice_count": 0,
+                    "exchange_rates": set(),
+                },
+            )
+            customer_credit_entry["total"] += customer_credit_amount
+            customer_credit_entry["company_currency_total"] += customer_credit_base_amount
+            customer_credit_entry["invoice_count"] += 1
+
+            if invoice_currency != company_currency:
+                rate = None
+                if customer_credit_amount:
+                    rate = (
+                        abs(customer_credit_base_amount) / abs(customer_credit_amount)
+                        if customer_credit_base_amount
+                        else None
+                    )
+                if not rate and conversion_rate:
+                    rate = flt(conversion_rate)
+                if rate:
+                    customer_credit_entry["exchange_rates"].add(rate)
+
         change_amount = flt(invoice.get("change_amount") or 0)
         has_overpayment_entry = invoice.get("name") in overpayment_invoice_names
 
@@ -422,7 +467,7 @@ def get_closing_shift_overview(pos_opening_shift):
         for payment in invoice.get("payments", []):
             mode = payment.get("mode_of_payment")
             payment_currency = resolve_payment_currency(payment, invoice_currency)
-            amount = flt(payment.get("amount") or 0)
+            amount = flt(payment.get("posa_original_amount") or payment.get("amount") or 0)
             base_amount = get_base_value(payment, "amount", "base_amount", conversion_rate)
             accumulate_payment(
                 payments_by_mode,
@@ -442,8 +487,8 @@ def get_closing_shift_overview(pos_opening_shift):
         )
         raw_amount = flt(entry.get("paid_amount") or 0)
         entry_rate = (
-            entry.get("target_exchange_rate")
-            or entry.get("source_exchange_rate")
+            entry.get("source_exchange_rate")
+            or entry.get("target_exchange_rate")
             or entry.get("exchange_rate")
         )
         raw_base_amount = get_base_value(
@@ -742,6 +787,14 @@ def get_closing_shift_overview(pos_opening_shift):
                 include_points=True,
             ),
         },
+        "customer_credit_redeemed": {
+            "count": customer_credit_redeemed_invoice_count,
+            "company_currency_total": flt(customer_credit_redeemed_company_currency_total),
+            "by_currency": prepare_currency_rows(
+                customer_credit_redeemed_totals_by_currency,
+                include_count=True,
+            ),
+        },
         "cash_expected": {
             "mode_of_payment": cash_mode_of_payment,
             "company_currency_total": flt(cash_expected_company_currency_total),
@@ -771,13 +824,18 @@ def get_payment_reconciliation_details(closing_shift_doc):
         if not mode_of_payment:
             return
 
+        resolved_currency = currency or company_currency
         row = payment_breakdown.setdefault(
-            mode_of_payment,
-            {"base": 0.0, "currencies": defaultdict(float)},
+            (mode_of_payment, resolved_currency),
+            {
+                "mode_of_payment": mode_of_payment,
+                "currency": resolved_currency,
+                "base": 0.0,
+                "amount": 0.0,
+            },
         )
         row["base"] += flt(base_amount)
-        if currency:
-            row["currencies"][currency] += flt(amount)
+        row["amount"] += flt(amount)
 
     cash_mode_of_payment = (
         frappe.db.get_value("POS Profile", closing_shift_doc.pos_profile, "posa_cash_mode_of_payment")
@@ -798,9 +856,9 @@ def get_payment_reconciliation_details(closing_shift_doc):
         currency = invoice_doc.get("currency") or company_currency
         conversion_rate = (
             invoice_doc.get("conversion_rate")
-            or invoice_doc.get("exchange_rate")
+            or invoice_doc.get("source_exchange_rate")
             or invoice_doc.get("target_exchange_rate")
-            or invoice_doc.get("plc_conversion_rate")
+            or invoice_doc.get("exchange_rate")
             or 1
         )
 
@@ -808,26 +866,40 @@ def get_payment_reconciliation_details(closing_shift_doc):
         net_breakdown[currency] += flt(invoice_doc.get("net_total") or 0)
 
         for payment in invoice_doc.get("payments", []):
+            payment_currency = resolve_payment_currency(payment, currency)
+            original_amount = payment.get("posa_original_amount")
+            if original_amount in (None, ""):
+                original_amount = payment.get("amount")
             update_payment_breakdown(
                 payment.mode_of_payment,
                 get_base_value(payment, "amount", "base_amount", conversion_rate),
-                currency,
-                payment.amount,
+                payment_currency,
+                original_amount,
             )
 
-        change_amount = invoice_doc.get("change_amount") or 0
-        if change_amount:
-            update_payment_breakdown(
-                cash_mode_of_payment,
-                -get_base_value(
-                    invoice_doc,
-                    "change_amount",
-                    "base_change_amount",
-                    conversion_rate,
-                ),
-                currency,
-                -change_amount,
-            )
+        change_rows = invoice_doc.get("posa_change_returns") or []
+        if change_rows:
+            for change in change_rows:
+                update_payment_breakdown(
+                    cash_mode_of_payment,
+                    -abs(flt(change.get("base_amount"))),
+                    change.get("currency") or currency,
+                    -abs(flt(change.get("original_amount"))),
+                )
+        else:
+            change_amount = invoice_doc.get("change_amount") or 0
+            if change_amount:
+                update_payment_breakdown(
+                    cash_mode_of_payment,
+                    -get_base_value(
+                        invoice_doc,
+                        "change_amount",
+                        "base_change_amount",
+                        conversion_rate,
+                    ),
+                    currency,
+                    -change_amount,
+                )
 
     for row in closing_shift_doc.get("pos_payments", []):
         payment_entry = row.get("payment_entry")
@@ -838,14 +910,23 @@ def get_payment_reconciliation_details(closing_shift_doc):
         payment_doc.check_permission("read")
         multiplier = -1 if payment_doc.get("payment_type") == "Pay" else 1
         currency = (
-            payment_doc.get("paid_from_account_currency")
-            or payment_doc.get("paid_to_account_currency")
-            or payment_doc.get("party_account_currency")
-            or payment_doc.get("currency")
-            or company_currency
+            payment_doc.get("paid_to_account_currency")
+            if payment_doc.get("payment_type") == "Receive"
+            else payment_doc.get("paid_from_account_currency")
+        ) or payment_doc.get("party_account_currency") or payment_doc.get("currency") or company_currency
+        base_payment_amount = (
+            payment_doc.get("base_received_amount") or payment_doc.get("base_paid_amount")
+            if payment_doc.get("payment_type") == "Receive"
+            else payment_doc.get("base_paid_amount")
         )
-        base_amount = multiplier * abs(flt(payment_doc.get("base_paid_amount") or 0))
-        paid_amount = multiplier * abs(flt(payment_doc.get("paid_amount") or 0))
+        base_amount = multiplier * abs(flt(base_payment_amount or 0))
+        paid_amount = multiplier * abs(
+            flt(
+                payment_doc.get("received_amount") or payment_doc.get("paid_amount")
+                if payment_doc.get("payment_type") == "Receive"
+                else payment_doc.get("paid_amount")
+            )
+        )
         mode_of_payment = row.get("mode_of_payment") or payment_doc.get("mode_of_payment")
 
         update_payment_breakdown(mode_of_payment, base_amount, currency, paid_amount)
@@ -854,13 +935,17 @@ def get_payment_reconciliation_details(closing_shift_doc):
     payment_breakdown_copy = payment_breakdown.copy()
     for detail in closing_shift_doc.get("payment_reconciliation", []):
         mop = detail.mode_of_payment
-        breakdown = payment_breakdown_copy.pop(mop, None)
+        detail_currency = getattr(detail, "currency", None) or company_currency
+        breakdown = payment_breakdown_copy.pop((mop, detail_currency), None)
         currencies = []
         if breakdown:
             currencies = [
-                frappe._dict({"currency": currency, "amount": amount})
-                for currency, amount in sorted(breakdown["currencies"].items())
-                if amount
+                frappe._dict(
+                    {
+                        "currency": breakdown["currency"],
+                        "amount": breakdown["amount"],
+                    }
+                )
             ]
 
         base_total = flt(detail.expected_amount) - flt(detail.opening_amount)
@@ -878,19 +963,22 @@ def get_payment_reconciliation_details(closing_shift_doc):
             )
         )
 
-    for mop, breakdown in payment_breakdown_copy.items():
+    for (_mop, _currency), breakdown in payment_breakdown_copy.items():
         mode_summaries.append(
             frappe._dict(
                 {
-                    "mode_of_payment": mop,
+                    "mode_of_payment": breakdown["mode_of_payment"],
                     "base_amount": breakdown["base"],
                     "opening_amount": 0,
                     "expected_amount": breakdown["base"],
                     "difference": 0,
                     "currency_breakdown": [
-                        frappe._dict({"currency": currency, "amount": amount})
-                        for currency, amount in sorted(breakdown["currencies"].items())
-                        if amount
+                        frappe._dict(
+                            {
+                                "currency": breakdown["currency"],
+                                "amount": breakdown["amount"],
+                            }
+                        )
                     ],
                 }
             )

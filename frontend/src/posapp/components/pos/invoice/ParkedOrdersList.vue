@@ -1,5 +1,10 @@
 <template>
-	<section class="drafts-list">
+	<section
+		ref="listRoot"
+		class="drafts-list"
+		tabindex="-1"
+		@keydown="handleKeydown"
+	>
 		<div class="drafts-list__header">
 			<div>
 				<p class="drafts-list__eyebrow">{{ eyebrow || __("Ready to resume") }}</p>
@@ -21,13 +26,24 @@
 			</div>
 		</div>
 
-		<div v-if="parkedOrders.length" class="drafts-list__cards">
+		<div v-if="loading" class="drafts-list__empty drafts-list__empty--loading">
+			<v-progress-circular indeterminate size="22" width="3" color="primary" />
+			<strong>{{ loadingTitle || __("Loading records...") }}</strong>
+		</div>
+		<div v-else-if="parkedOrders.length" class="drafts-list__cards">
 			<button
-				v-for="draft in parkedOrders"
+				v-for="(draft, index) in parkedOrders"
 				:key="draft.name"
+				:ref="(el) => setCardRef(el, index)"
 				type="button"
 				class="drafts-list__card"
+				:class="{ 'drafts-list__card--selected': selectedIndex === index }"
+				:tabindex="selectedIndex === index ? 0 : -1"
+				:aria-current="selectedIndex === index ? 'true' : undefined"
 				:data-test="`draft-list-card-${draft.name}`"
+				@focus="selectedIndex = index"
+				@mouseenter="selectedIndex = index"
+				@keydown.stop="handleKeydown"
 				@click="$emit('resume', draft)"
 			>
 				<div class="drafts-list__card-top">
@@ -51,7 +67,9 @@
 </template>
 
 <script setup>
-defineProps({
+import { nextTick, ref, watch } from "vue";
+
+const props = defineProps({
 	parkedOrders: {
 		type: Array,
 		default: () => [],
@@ -88,11 +106,127 @@ defineProps({
 		type: String,
 		default: "",
 	},
+	loading: {
+		type: Boolean,
+		default: false,
+	},
+	loadingTitle: {
+		type: String,
+		default: "",
+	},
 });
 
-defineEmits(["resume", "manage-all"]);
+const emit = defineEmits(["resume", "manage-all", "close"]);
 
 const __ = window.__;
+const listRoot = ref(null);
+const cardRefs = ref([]);
+const selectedIndex = ref(0);
+
+function clampSelectedIndex() {
+	const maxIndex = props.parkedOrders.length - 1;
+	if (maxIndex < 0) {
+		selectedIndex.value = 0;
+		return;
+	}
+	selectedIndex.value = Math.min(Math.max(selectedIndex.value, 0), maxIndex);
+}
+
+function setCardRef(el, index) {
+	if (el) {
+		cardRefs.value[index] = el;
+	}
+}
+
+function focusSelectedDraft() {
+	return nextTick(() => {
+		clampSelectedIndex();
+		const button = cardRefs.value[selectedIndex.value];
+		if (button?.focus) {
+			button.focus({ preventScroll: true });
+			button.scrollIntoView?.({ block: "nearest" });
+			return;
+		}
+		listRoot.value?.focus?.({ preventScroll: true });
+	});
+}
+
+function focusFirstDraft() {
+	selectedIndex.value = 0;
+	return focusSelectedDraft();
+}
+
+function selectOffset(offset) {
+	const count = props.parkedOrders.length;
+	if (!count) {
+		return;
+	}
+	selectedIndex.value = (selectedIndex.value + offset + count) % count;
+	focusSelectedDraft();
+}
+
+function resumeSelectedDraft() {
+	const draft = props.parkedOrders[selectedIndex.value];
+	if (draft) {
+		emit("resume", draft);
+	}
+}
+
+function isManageAllTarget(target) {
+	return Boolean(target?.closest?.('[data-test="drafts-manage-all"]'));
+}
+
+function handleKeydown(event) {
+	if (event.key === "Escape") {
+		event.preventDefault();
+		emit("close");
+		return;
+	}
+
+	if (event.key === "ArrowDown") {
+		event.preventDefault();
+		selectOffset(1);
+		return;
+	}
+
+	if (event.key === "ArrowUp") {
+		event.preventDefault();
+		selectOffset(-1);
+		return;
+	}
+
+	if (event.key === "Home") {
+		event.preventDefault();
+		selectedIndex.value = 0;
+		focusSelectedDraft();
+		return;
+	}
+
+	if (event.key === "End") {
+		event.preventDefault();
+		selectedIndex.value = Math.max(0, props.parkedOrders.length - 1);
+		focusSelectedDraft();
+		return;
+	}
+
+	if ((event.key === "Enter" || event.key === " ") && !isManageAllTarget(event.target)) {
+		event.preventDefault();
+		resumeSelectedDraft();
+	}
+}
+
+watch(
+	() => props.parkedOrders.length,
+	() => {
+		cardRefs.value = [];
+		clampSelectedIndex();
+	},
+);
+
+defineExpose({
+	focusFirstDraft,
+	focusSelectedDraft,
+});
 </script>
 
 <style scoped>
@@ -162,12 +296,18 @@ const __ = window.__;
 .drafts-list__empty {
 	display: flex;
 	flex-direction: column;
+	align-items: flex-start;
 	gap: 6px;
 	padding: 18px 16px;
 	border-radius: 18px;
 	border: 1px dashed rgba(var(--v-theme-primary), 0.24);
 	background: rgba(var(--v-theme-surface), 0.72);
 	color: var(--pos-text-secondary);
+}
+
+.drafts-list__empty--loading {
+	flex-direction: row;
+	align-items: center;
 }
 
 .drafts-list__empty strong {
@@ -192,10 +332,17 @@ const __ = window.__;
 }
 
 .drafts-list__card:hover,
-.drafts-list__card:focus-visible {
+.drafts-list__card:focus-visible,
+.drafts-list__card--selected {
 	transform: translateY(-1px);
 	box-shadow: 0 10px 18px rgba(15, 23, 42, 0.12);
 	border-color: rgba(var(--v-theme-primary), 0.34);
+}
+
+.drafts-list__card:focus-visible,
+.drafts-list__card--selected {
+	outline: 2px solid rgba(var(--v-theme-primary), 0.62);
+	outline-offset: 2px;
 }
 
 .drafts-list__card-top {

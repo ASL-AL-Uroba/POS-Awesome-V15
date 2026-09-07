@@ -6,37 +6,31 @@
 
 # offline
 
-Public barrel for the POS offline layer.
-
-Import all offline functionality from this module rather than from individual
-sub-modules. The layer is composed of four levels:
-
-- **`db`** — storage primitives: the Dexie IndexedDB instance (`db`), the
-  in-memory store (`memory`), `persist()`, network-status helpers, and
-  cache-clear utilities. Every other sub-module in this layer depends on these.
-
-- **Domain queues** (`invoices`, `customers`, `payments`, `cash_movements`,
-  `stock`) — per-domain read/write helpers for data queued while the device is
-  offline and replayed to the server when connectivity is restored.
-
-- **`cache`** — named key-value accessors for reference data fetched from the
-  server (offers, price lists, exchange rates, item details, etc.). Every write
-  goes through `memory` and calls `persist()`.
-
-- **`sync/*`** — background sync engine composed of `types`, `resourceRegistry`,
-  `syncState`, `SyncCoordinator`, `useSyncCoordinator`, and per-resource
-  `adapters`.
-
-`memoryInitPromise` is a backward-compatible alias for `initPromise` (from `db`).
-Await it before reading any `memory` value at application startup.
-
 ## Functions
+
+### beginItemCatalogGeneration()
+
+> **beginItemCatalogGeneration**(`scope`): `Promise`\<\{ `generation`: `string`; `scope`: `string`; \}\>
+
+Defined in: [offline/cache.ts:447](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L447)
+
+#### Parameters
+
+##### scope
+
+`string`
+
+#### Returns
+
+`Promise`\<\{ `generation`: `string`; `scope`: `string`; \}\>
+
+***
 
 ### buildSyncStateStorageKey()
 
 > **buildSyncStateStorageKey**(`resourceId`): `string`
 
-Defined in: [offline/sync/syncState.ts:11](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/syncState.ts#L11)
+Defined in: [offline/sync/syncState.ts:11](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/syncState.ts#L11)
 
 #### Parameters
 
@@ -54,7 +48,7 @@ Defined in: [offline/sync/syncState.ts:11](https://github.com/ASL-AL-Uroba/POS-A
 
 > **checkDbHealth**(): `Promise`\<`boolean`\>
 
-Defined in: [offline/db.ts:807](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L807)
+Defined in: [offline/db.ts:1541](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1541)
 
 #### Returns
 
@@ -66,7 +60,7 @@ Defined in: [offline/db.ts:807](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **claimRetryableQueueEntries**(`entityType`): `Promise`\<[`OfflineQueueEntry`](#offlinequeueentry)[]\>
 
-Defined in: [offline/writeQueue.ts:429](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L429)
+Defined in: [offline/writeQueue.ts:443](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L443)
 
 #### Parameters
 
@@ -84,7 +78,7 @@ Defined in: [offline/writeQueue.ts:429](https://github.com/ASL-AL-Uroba/POS-Awes
 
 > **clearAllCache**(): `Promise`\<`void`\>
 
-Defined in: [offline/db.ts:665](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L665)
+Defined in: [offline/db.ts:1328](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1328)
 
 #### Returns
 
@@ -96,7 +90,7 @@ Defined in: [offline/db.ts:665](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **clearCoupons**(): `void`
 
-Defined in: [offline/cache.ts:1271](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1271)
+Defined in: [offline/cache.ts:1945](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1945)
 
 #### Returns
 
@@ -108,7 +102,7 @@ Defined in: [offline/cache.ts:1271](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **clearCustomerBalanceCache**(): `void`
 
-Defined in: [offline/customers.ts:395](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L395)
+Defined in: [offline/customers.ts:469](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L469)
 
 #### Returns
 
@@ -120,7 +114,7 @@ Defined in: [offline/customers.ts:395](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **clearCustomerStorage**(): `Promise`\<`void`\>
 
-Defined in: [offline/cache.ts:1122](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1122)
+Defined in: [offline/cache.ts:1796](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1796)
 
 #### Returns
 
@@ -132,7 +126,7 @@ Defined in: [offline/cache.ts:1122](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **clearDerivedOfflineCaches**(): `Promise`\<`void`\>
 
-Defined in: [offline/db.ts:731](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L731)
+Defined in: [offline/db.ts:1394](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1394)
 
 #### Returns
 
@@ -144,7 +138,7 @@ Defined in: [offline/db.ts:731](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **clearExpiredCustomerBalances**(): `void`
 
-Defined in: [offline/customers.ts:404](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L404)
+Defined in: [offline/customers.ts:478](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L478)
 
 #### Returns
 
@@ -156,7 +150,7 @@ Defined in: [offline/customers.ts:404](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **clearGiftCardSnapshotCache**(): `void`
 
-Defined in: [offline/customers.ts:355](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L355)
+Defined in: [offline/customers.ts:425](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L425)
 
 #### Returns
 
@@ -168,7 +162,7 @@ Defined in: [offline/customers.ts:355](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **clearItemDetailsCache**(): `void`
 
-Defined in: [offline/cache.ts:767](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L767)
+Defined in: [offline/cache.ts:1437](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1437)
 
 #### Returns
 
@@ -180,7 +174,7 @@ Defined in: [offline/cache.ts:767](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **clearItemGroups**(): `void`
 
-Defined in: [offline/cache.ts:1296](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1296)
+Defined in: [offline/cache.ts:1970](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1970)
 
 #### Returns
 
@@ -192,7 +186,7 @@ Defined in: [offline/cache.ts:1296](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **clearLocalStockCache**(): `void`
 
-Defined in: [offline/stock.ts:181](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/stock.ts#L181)
+Defined in: [offline/stock.ts:181](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/stock.ts#L181)
 
 #### Returns
 
@@ -204,7 +198,7 @@ Defined in: [offline/stock.ts:181](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **clearOfflineCashMovements**(): `Promise`\<`void`\>
 
-Defined in: [offline/cash\_movements.ts:39](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cash_movements.ts#L39)
+Defined in: [offline/cash\_movements.ts:39](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cash_movements.ts#L39)
 
 #### Returns
 
@@ -216,7 +210,7 @@ Defined in: [offline/cash\_movements.ts:39](https://github.com/ASL-AL-Uroba/POS-
 
 > **clearOfflineCustomers**(): `Promise`\<`void`\>
 
-Defined in: [offline/customers.ts:58](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L58)
+Defined in: [offline/customers.ts:63](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L63)
 
 #### Returns
 
@@ -228,7 +222,7 @@ Defined in: [offline/customers.ts:58](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **clearOfflineInvoices**(): `Promise`\<`void`\>
 
-Defined in: [offline/invoices.ts:238](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoices.ts#L238)
+Defined in: [offline/invoices.ts:238](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoices.ts#L238)
 
 #### Returns
 
@@ -240,7 +234,7 @@ Defined in: [offline/invoices.ts:238](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **clearOfflinePayments**(): `Promise`\<`void`\>
 
-Defined in: [offline/payments.ts:55](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/payments.ts#L55)
+Defined in: [offline/payments.ts:55](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/payments.ts#L55)
 
 #### Returns
 
@@ -252,7 +246,7 @@ Defined in: [offline/payments.ts:55](https://github.com/ASL-AL-Uroba/POS-Awesome
 
 > **clearOpeningStorage**(): `void`
 
-Defined in: [offline/cache.ts:1009](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1009)
+Defined in: [offline/cache.ts:1681](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1681)
 
 #### Returns
 
@@ -264,7 +258,7 @@ Defined in: [offline/cache.ts:1009](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **clearPriceListCache**(): `void`
 
-Defined in: [offline/cache.ts:578](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L578)
+Defined in: [offline/cache.ts:1124](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1124)
 
 #### Returns
 
@@ -276,7 +270,7 @@ Defined in: [offline/cache.ts:578](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **clearPricingRulesSnapshot**(): `void`
 
-Defined in: [offline/cache.ts:1177](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1177)
+Defined in: [offline/cache.ts:1851](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1851)
 
 #### Returns
 
@@ -288,7 +282,7 @@ Defined in: [offline/cache.ts:1177](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **clearStoredItems**(`scope?`): `Promise`\<`void`\>
 
-Defined in: [offline/cache.ts:441](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L441)
+Defined in: [offline/cache.ts:909](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L909)
 
 #### Parameters
 
@@ -306,7 +300,7 @@ Defined in: [offline/cache.ts:441](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **clearStoredValueSnapshotCache**(): `void`
 
-Defined in: [offline/customers.ts:311](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L311)
+Defined in: [offline/customers.ts:374](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L374)
 
 #### Returns
 
@@ -318,7 +312,7 @@ Defined in: [offline/customers.ts:311](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **clearSyncResourceState**(`resourceId`): `Promise`\<`void`\>
 
-Defined in: [offline/sync/syncState.ts:96](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/syncState.ts#L96)
+Defined in: [offline/sync/syncState.ts:96](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/syncState.ts#L96)
 
 #### Parameters
 
@@ -336,7 +330,7 @@ Defined in: [offline/sync/syncState.ts:96](https://github.com/ASL-AL-Uroba/POS-A
 
 > **clearWriteQueueEntries**(`entityType`, `options?`): `Promise`\<`void`\>
 
-Defined in: [offline/writeQueue.ts:410](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L410)
+Defined in: [offline/writeQueue.ts:422](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L422)
 
 #### Parameters
 
@@ -360,7 +354,7 @@ Defined in: [offline/writeQueue.ts:410](https://github.com/ASL-AL-Uroba/POS-Awes
 
 > **createDefaultSyncCoordinator**(): [`SyncCoordinator`](#synccoordinator)
 
-Defined in: [offline/sync/SyncCoordinator.ts:467](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/SyncCoordinator.ts#L467)
+Defined in: [offline/sync/SyncCoordinator.ts:467](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/SyncCoordinator.ts#L467)
 
 Creates a [SyncCoordinator](#synccoordinator) pre-loaded with the full default resource registry.
 This is the standard factory used by `useSyncCoordinator` at app startup.
@@ -375,7 +369,7 @@ This is the standard factory used by `useSyncCoordinator` at app startup.
 
 > **deleteCustomerStorageByNames**(`names`): `Promise`\<`void`\>
 
-Defined in: [offline/customers.ts:235](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L235)
+Defined in: [offline/customers.ts:293](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L293)
 
 #### Parameters
 
@@ -393,7 +387,7 @@ Defined in: [offline/customers.ts:235](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **deleteOfflineCashMovement**(`index`): `Promise`\<`void`\>
 
-Defined in: [offline/cash\_movements.ts:43](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cash_movements.ts#L43)
+Defined in: [offline/cash\_movements.ts:43](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cash_movements.ts#L43)
 
 #### Parameters
 
@@ -411,7 +405,7 @@ Defined in: [offline/cash\_movements.ts:43](https://github.com/ASL-AL-Uroba/POS-
 
 > **deleteOfflineCustomer**(`index`): `Promise`\<`void`\>
 
-Defined in: [offline/customers.ts:62](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L62)
+Defined in: [offline/customers.ts:67](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L67)
 
 #### Parameters
 
@@ -429,7 +423,7 @@ Defined in: [offline/customers.ts:62](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **deleteOfflineInvoice**(`index`): `Promise`\<`void`\>
 
-Defined in: [offline/invoices.ts:242](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoices.ts#L242)
+Defined in: [offline/invoices.ts:242](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoices.ts#L242)
 
 #### Parameters
 
@@ -447,7 +441,7 @@ Defined in: [offline/invoices.ts:242](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **deleteOfflinePayment**(`index`): `Promise`\<`void`\>
 
-Defined in: [offline/payments.ts:59](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/payments.ts#L59)
+Defined in: [offline/payments.ts:59](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/payments.ts#L59)
 
 #### Parameters
 
@@ -465,7 +459,7 @@ Defined in: [offline/payments.ts:59](https://github.com/ASL-AL-Uroba/POS-Awesome
 
 > **deleteStoredItemsByCodes**(`itemCodes?`, `scope?`): `Promise`\<`void`\>
 
-Defined in: [offline/cache.ts:491](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L491)
+Defined in: [offline/cache.ts:988](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L988)
 
 #### Parameters
 
@@ -487,7 +481,7 @@ Defined in: [offline/cache.ts:491](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **deleteWriteQueueEntry**(`entityType`, `queueId`): `Promise`\<`void`\>
 
-Defined in: [offline/writeQueue.ts:389](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L389)
+Defined in: [offline/writeQueue.ts:401](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L401)
 
 #### Parameters
 
@@ -509,7 +503,7 @@ Defined in: [offline/writeQueue.ts:389](https://github.com/ASL-AL-Uroba/POS-Awes
 
 > **deleteWriteQueueEntryByIndex**(`entityType`, `index`): `Promise`\<`void`\>
 
-Defined in: [offline/writeQueue.ts:398](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L398)
+Defined in: [offline/writeQueue.ts:410](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L410)
 
 #### Parameters
 
@@ -527,11 +521,107 @@ Defined in: [offline/writeQueue.ts:398](https://github.com/ASL-AL-Uroba/POS-Awes
 
 ***
 
+### deriveItemSearchFields()
+
+> **deriveItemSearchFields**(`item`): `object`
+
+Defined in: [offline/cache.ts:118](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L118)
+
+#### Parameters
+
+##### item
+
+`SearchableItem` \| `null` \| `undefined`
+
+#### Returns
+
+`object`
+
+##### barcodes
+
+> **barcodes**: `string`[]
+
+##### barcodes\_lc
+
+> **barcodes\_lc**: `string`[] = `barcodesLc`
+
+##### batch\_no\_data?
+
+> `optional` **batch\_no\_data?**: `ItemBatchEntry`[] \| `null`
+
+##### batches
+
+> **batches**: `string`[]
+
+##### item\_barcode?
+
+> `optional` **item\_barcode?**: `string` \| `ItemBarcodeEntry`[] \| `null`
+
+##### item\_code?
+
+> `optional` **item\_code?**: `string` \| `null`
+
+##### item\_code\_lc
+
+> **item\_code\_lc**: `string` = `itemCodeLc`
+
+##### item\_name?
+
+> `optional` **item\_name?**: `string` \| `null`
+
+##### item\_name\_lc
+
+> **item\_name\_lc**: `string` = `itemNameLc`
+
+##### name\_keywords
+
+> **name\_keywords**: `string`[] = `nameKeywords`
+
+##### name\_keywords\_lc
+
+> **name\_keywords\_lc**: `string`[] = `nameKeywordsLc`
+
+##### search\_text
+
+> **search\_text**: `string`
+
+##### serial\_no\_data?
+
+> `optional` **serial\_no\_data?**: `ItemSerialEntry`[] \| `null`
+
+##### serials
+
+> **serials**: `string`[]
+
+***
+
+### discardItemCatalogGeneration()
+
+> **discardItemCatalogGeneration**(`scope`, `generation`): `Promise`\<`void`\>
+
+Defined in: [offline/cache.ts:527](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L527)
+
+#### Parameters
+
+##### scope
+
+`string`
+
+##### generation
+
+`string`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### enqueueInvoiceOutboxEntry()
 
 > **enqueueInvoiceOutboxEntry**(`entry`): `Promise`\<`any`\>
 
-Defined in: [offline/invoiceOutbox.ts:88](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L88)
+Defined in: [offline/invoiceOutbox.ts:145](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L145)
 
 #### Parameters
 
@@ -549,7 +639,7 @@ Defined in: [offline/invoiceOutbox.ts:88](https://github.com/ASL-AL-Uroba/POS-Aw
 
 > **enqueueWriteQueueEntry**(`entityType`, `payload`, `options?`): `Promise`\<`any`\>
 
-Defined in: [offline/writeQueue.ts:380](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L380)
+Defined in: [offline/writeQueue.ts:392](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L392)
 
 #### Parameters
 
@@ -577,7 +667,7 @@ Defined in: [offline/writeQueue.ts:380](https://github.com/ASL-AL-Uroba/POS-Awes
 
 > **ensureOfflineQueueReady**(): `Promise`\<`void`\>
 
-Defined in: [offline/writeQueue.ts:600](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L600)
+Defined in: [offline/writeQueue.ts:666](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L666)
 
 #### Returns
 
@@ -585,11 +675,23 @@ Defined in: [offline/writeQueue.ts:600](https://github.com/ASL-AL-Uroba/POS-Awes
 
 ***
 
+### exportOfflineRecoveryData()
+
+> **exportOfflineRecoveryData**(): `Promise`\<\{ `database`: `any`; `exportedAt`: `string`; `invoiceIntentJournal`: `Record`\<`string`, `unknown`\>; `invoiceOutbox`: `any`; `legacyQueue`: `any`; `version`: `any`; `writeQueue`: `any`; \}\>
+
+Defined in: [offline/db.ts:1502](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1502)
+
+#### Returns
+
+`Promise`\<\{ `database`: `any`; `exportedAt`: `string`; `invoiceIntentJournal`: `Record`\<`string`, `unknown`\>; `invoiceOutbox`: `any`; `legacyQueue`: `any`; `version`: `any`; `writeQueue`: `any`; \}\>
+
+***
+
 ### fetchItemStockQuantities()
 
 > **fetchItemStockQuantities**(`items`, `pos_profile`, `chunkSize?`): `Promise`\<`AnyRecord`[] \| `null`\>
 
-Defined in: [offline/stock.ts:6](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/stock.ts#L6)
+Defined in: [offline/stock.ts:6](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/stock.ts#L6)
 
 #### Parameters
 
@@ -611,11 +713,11 @@ Defined in: [offline/stock.ts:6](https://github.com/ASL-AL-Uroba/POS-Awesome-V15
 
 ***
 
-### forceClearAllCache()
+### flushPersistQueue()
 
-> **forceClearAllCache**(): `Promise`\<`void`\>
+> **flushPersistQueue**(): `Promise`\<`void`\>
 
-Defined in: [offline/db.ts:715](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L715)
+Defined in: [offline/db.ts:1032](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1032)
 
 #### Returns
 
@@ -623,11 +725,41 @@ Defined in: [offline/db.ts:715](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 ***
 
+### forceClearAllCache()
+
+> **forceClearAllCache**(): `Promise`\<`void`\>
+
+Defined in: [offline/db.ts:1378](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1378)
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### getActiveItemCatalogGeneration()
+
+> **getActiveItemCatalogGeneration**(`scope`): `Promise`\<`string` \| `null`\>
+
+Defined in: [offline/cache.ts:354](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L354)
+
+#### Parameters
+
+##### scope
+
+`string`
+
+#### Returns
+
+`Promise`\<`string` \| `null`\>
+
+***
+
 ### getAllStoredItems()
 
 > **getAllStoredItems**(`scope?`): `Promise`\<`any`\>
 
-Defined in: [offline/cache.ts:338](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L338)
+Defined in: [offline/cache.ts:801](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L801)
 
 #### Parameters
 
@@ -645,7 +777,7 @@ Defined in: [offline/cache.ts:338](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **getBootstrapLimitedMode**(): `boolean`
 
-Defined in: [offline/cache.ts:928](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L928)
+Defined in: [offline/cache.ts:1601](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1601)
 
 #### Returns
 
@@ -657,7 +789,7 @@ Defined in: [offline/cache.ts:928](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **getBootstrapSnapshot**(): `any`
 
-Defined in: [offline/cache.ts:870](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L870)
+Defined in: [offline/cache.ts:1540](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1540)
 
 #### Returns
 
@@ -669,7 +801,7 @@ Defined in: [offline/cache.ts:870](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **getBootstrapSnapshotStatus**(): `any`
 
-Defined in: [offline/cache.ts:913](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L913)
+Defined in: [offline/cache.ts:1586](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1586)
 
 #### Returns
 
@@ -681,7 +813,7 @@ Defined in: [offline/cache.ts:913](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **getCachedCoupons**(): `any`
 
-Defined in: [offline/cache.ts:1267](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1267)
+Defined in: [offline/cache.ts:1941](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1941)
 
 #### Returns
 
@@ -693,7 +825,7 @@ Defined in: [offline/cache.ts:1267](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getCachedCurrencyOptions**(`profileName`, `ttlMs?`): `any`
 
-Defined in: [offline/cache.ts:1376](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1376)
+Defined in: [offline/cache.ts:2052](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L2052)
 
 #### Parameters
 
@@ -715,7 +847,7 @@ Defined in: [offline/cache.ts:1376](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getCachedCustomerAddresses**(`customer`, `ttlMs?`): `any`
 
-Defined in: [offline/cache.ts:1505](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1505)
+Defined in: [offline/cache.ts:2182](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L2182)
 
 #### Parameters
 
@@ -737,7 +869,7 @@ Defined in: [offline/cache.ts:1505](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getCachedCustomerBalance**(`customer`): `any`
 
-Defined in: [offline/customers.ts:379](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L379)
+Defined in: [offline/customers.ts:453](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L453)
 
 #### Parameters
 
@@ -755,7 +887,7 @@ Defined in: [offline/customers.ts:379](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **getCachedDeliveryCharges**(`profileName`, `customer`, `ttlMs?`): `any`
 
-Defined in: [offline/cache.ts:1336](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1336)
+Defined in: [offline/cache.ts:2011](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L2011)
 
 #### Parameters
 
@@ -781,7 +913,7 @@ Defined in: [offline/cache.ts:1336](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getCachedExchangeRate**(`entry?`, `ttlMs?`): `any`
 
-Defined in: [offline/cache.ts:1420](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1420)
+Defined in: [offline/cache.ts:2097](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L2097)
 
 #### Parameters
 
@@ -803,7 +935,7 @@ Defined in: [offline/cache.ts:1420](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getCachedGiftCardSnapshot**(`giftCardCode`): `any`
 
-Defined in: [offline/customers.ts:338](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L338)
+Defined in: [offline/customers.ts:406](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L406)
 
 #### Parameters
 
@@ -821,7 +953,7 @@ Defined in: [offline/customers.ts:338](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **getCachedItemDetails**(`profileName`, `priceList`, `itemCodes`, `ttl?`): `Promise`\<\{ `cached`: `any`[]; `missing`: `string`[]; \}\>
 
-Defined in: [offline/cache.ts:724](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L724)
+Defined in: [offline/cache.ts:1393](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1393)
 
 Returns cached item details, split into `cached` (fresh) and `missing` (absent or stale)
 groups so callers know exactly which items need a network fetch.
@@ -870,7 +1002,7 @@ Cache TTL in milliseconds. Defaults to 15 minutes.
 
 > **getCachedItemGroups**(): `any`
 
-Defined in: [offline/cache.ts:1292](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1292)
+Defined in: [offline/cache.ts:1966](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1966)
 
 #### Returns
 
@@ -878,11 +1010,51 @@ Defined in: [offline/cache.ts:1292](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 ***
 
+### getCachedItemPriceForUom()
+
+> **getCachedItemPriceForUom**(`__namedParameters`): `Promise`\<`OfflineItemPriceRecord` \| `null`\>
+
+Defined in: [offline/cache.ts:1094](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1094)
+
+#### Parameters
+
+##### \_\_namedParameters
+
+###### currency?
+
+`string` \| `null` = `null`
+
+###### customer?
+
+`string` \| `null` = `null`
+
+###### date?
+
+`string` \| `null` = `null`
+
+###### itemCode
+
+`string`
+
+###### priceList
+
+`string`
+
+###### uom
+
+`string`
+
+#### Returns
+
+`Promise`\<`OfflineItemPriceRecord` \| `null`\>
+
+***
+
 ### getCachedOffers()
 
 > **getCachedOffers**(): `any`
 
-Defined in: [offline/cache.ts:532](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L532)
+Defined in: [offline/cache.ts:1048](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1048)
 
 #### Returns
 
@@ -894,7 +1066,7 @@ Defined in: [offline/cache.ts:532](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **getCachedPaymentMethodCurrencyMap**(`company`, `ttlMs?`): `any`
 
-Defined in: [offline/cache.ts:1545](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1545)
+Defined in: [offline/cache.ts:2222](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L2222)
 
 #### Parameters
 
@@ -916,7 +1088,7 @@ Defined in: [offline/cache.ts:1545](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getCachedPriceListItems**(`priceList`): `any`
 
-Defined in: [offline/cache.ts:562](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L562)
+Defined in: [offline/cache.ts:1078](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1078)
 
 #### Parameters
 
@@ -934,7 +1106,7 @@ Defined in: [offline/cache.ts:562](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **getCachedPriceListMeta**(`profileName`, `ttlMs?`): `any`
 
-Defined in: [offline/cache.ts:1465](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1465)
+Defined in: [offline/cache.ts:2142](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L2142)
 
 #### Parameters
 
@@ -956,7 +1128,7 @@ Defined in: [offline/cache.ts:1465](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getCachedPricingRulesSnapshot**(): `object`
 
-Defined in: [offline/cache.ts:1166](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1166)
+Defined in: [offline/cache.ts:1840](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1840)
 
 #### Returns
 
@@ -984,7 +1156,7 @@ Defined in: [offline/cache.ts:1166](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getCachedStoredValueSnapshot**(`customer`, `company`): `any`
 
-Defined in: [offline/customers.ts:294](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L294)
+Defined in: [offline/customers.ts:354](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L354)
 
 #### Parameters
 
@@ -1006,7 +1178,7 @@ Defined in: [offline/customers.ts:294](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **getCacheUsageEstimate**(): `Promise`\<\{ `indexedDB`: `number`; `localStorage`: `number`; `percentage`: `number`; `total`: `number`; \}\>
 
-Defined in: [offline/cache.ts:1562](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1562)
+Defined in: [offline/cache.ts:2239](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L2239)
 
 #### Returns
 
@@ -1018,7 +1190,7 @@ Defined in: [offline/cache.ts:1562](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getCustomersLastSync**(): `any`
 
-Defined in: [offline/cache.ts:1108](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1108)
+Defined in: [offline/cache.ts:1782](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1782)
 
 #### Returns
 
@@ -1030,7 +1202,7 @@ Defined in: [offline/cache.ts:1108](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getCustomerStorage**(): `any`
 
-Defined in: [offline/customers.ts:125](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L125)
+Defined in: [offline/customers.ts:133](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L133)
 
 #### Returns
 
@@ -1042,7 +1214,7 @@ Defined in: [offline/customers.ts:125](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **getCustomerStorageCount**(): `Promise`\<`any`\>
 
-Defined in: [offline/cache.ts:1112](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1112)
+Defined in: [offline/cache.ts:1786](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1786)
 
 #### Returns
 
@@ -1054,7 +1226,7 @@ Defined in: [offline/cache.ts:1112](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getInvoiceOutboxMode**(): [`InvoiceOutboxMode`](#invoiceoutboxmode)
 
-Defined in: [offline/invoiceOutbox.ts:65](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L65)
+Defined in: [offline/invoiceOutbox.ts:75](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L75)
 
 #### Returns
 
@@ -1066,7 +1238,7 @@ Defined in: [offline/invoiceOutbox.ts:65](https://github.com/ASL-AL-Uroba/POS-Aw
 
 > **getInvoiceOutboxRows**(`options?`): `Promise`\<[`InvoiceOutboxEntry`](#invoiceoutboxentry)[]\>
 
-Defined in: [offline/invoiceOutbox.ts:127](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L127)
+Defined in: [offline/invoiceOutbox.ts:191](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L191)
 
 #### Parameters
 
@@ -1086,7 +1258,7 @@ Defined in: [offline/invoiceOutbox.ts:127](https://github.com/ASL-AL-Uroba/POS-A
 
 > **getItemsLastSync**(): `any`
 
-Defined in: [offline/cache.ts:1099](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1099)
+Defined in: [offline/cache.ts:1773](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1773)
 
 #### Returns
 
@@ -1098,7 +1270,7 @@ Defined in: [offline/cache.ts:1099](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getItemUOMs**(`itemCode`): `any`
 
-Defined in: [offline/cache.ts:470](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L470)
+Defined in: [offline/cache.ts:967](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L967)
 
 #### Parameters
 
@@ -1116,7 +1288,7 @@ Defined in: [offline/cache.ts:470](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **getLastSyncTotals**(): `any`
 
-Defined in: [offline/invoices.ts:267](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoices.ts#L267)
+Defined in: [offline/invoices.ts:267](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoices.ts#L267)
 
 #### Returns
 
@@ -1128,7 +1300,7 @@ Defined in: [offline/invoices.ts:267](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **getLocalStock**(`itemCode`): `any`
 
-Defined in: [offline/stock.ts:150](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/stock.ts#L150)
+Defined in: [offline/stock.ts:150](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/stock.ts#L150)
 
 #### Parameters
 
@@ -1146,7 +1318,7 @@ Defined in: [offline/stock.ts:150](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **getLocalStockCache**(): `any`
 
-Defined in: [offline/stock.ts:254](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/stock.ts#L254)
+Defined in: [offline/stock.ts:254](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/stock.ts#L254)
 
 #### Returns
 
@@ -1158,7 +1330,7 @@ Defined in: [offline/stock.ts:254](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **getOfflineCashMovements**(): `any`[]
 
-Defined in: [offline/cash\_movements.ts:35](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cash_movements.ts#L35)
+Defined in: [offline/cash\_movements.ts:35](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cash_movements.ts#L35)
 
 #### Returns
 
@@ -1170,7 +1342,7 @@ Defined in: [offline/cash\_movements.ts:35](https://github.com/ASL-AL-Uroba/POS-
 
 > **getOfflineCustomers**(): `any`[]
 
-Defined in: [offline/customers.ts:54](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L54)
+Defined in: [offline/customers.ts:59](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L59)
 
 #### Returns
 
@@ -1182,7 +1354,7 @@ Defined in: [offline/customers.ts:54](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **getOfflineInvoices**(): `any`[]
 
-Defined in: [offline/invoices.ts:234](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoices.ts#L234)
+Defined in: [offline/invoices.ts:234](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoices.ts#L234)
 
 #### Returns
 
@@ -1194,7 +1366,7 @@ Defined in: [offline/invoices.ts:234](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **getOfflinePayments**(): `any`[]
 
-Defined in: [offline/payments.ts:51](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/payments.ts#L51)
+Defined in: [offline/payments.ts:51](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/payments.ts#L51)
 
 #### Returns
 
@@ -1202,11 +1374,23 @@ Defined in: [offline/payments.ts:51](https://github.com/ASL-AL-Uroba/POS-Awesome
 
 ***
 
+### getOfflineStorageDiagnostics()
+
+> **getOfflineStorageDiagnostics**(): `Promise`\<\{ `database`: `any`; `quota`: `number` \| `null`; `tableCounts`: \{\[`k`: `string`\]: `any`; \}; `usage`: `number` \| `null`; `version`: `any`; \}\>
+
+Defined in: [offline/db.ts:1471](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1471)
+
+#### Returns
+
+`Promise`\<\{ `database`: `any`; `quota`: `number` \| `null`; `tableCounts`: \{\[`k`: `string`\]: `any`; \}; `usage`: `number` \| `null`; `version`: `any`; \}\>
+
+***
+
 ### getOpeningDialogStorage()
 
 > **getOpeningDialogStorage**(): `any`
 
-Defined in: [offline/cache.ts:1020](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1020)
+Defined in: [offline/cache.ts:1694](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1694)
 
 #### Returns
 
@@ -1218,7 +1402,7 @@ Defined in: [offline/cache.ts:1020](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getOpeningStorage**(): `any`
 
-Defined in: [offline/cache.ts:866](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L866)
+Defined in: [offline/cache.ts:1536](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1536)
 
 #### Returns
 
@@ -1230,7 +1414,7 @@ Defined in: [offline/cache.ts:866](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **getPendingInvoiceOutboxCount**(): `Promise`\<`number`\>
 
-Defined in: [offline/invoiceOutbox.ts:140](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L140)
+Defined in: [offline/invoiceOutbox.ts:204](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L204)
 
 #### Returns
 
@@ -1242,7 +1426,7 @@ Defined in: [offline/invoiceOutbox.ts:140](https://github.com/ASL-AL-Uroba/POS-A
 
 > **getPendingOfflineCashMovementCount**(): `any`
 
-Defined in: [offline/cash\_movements.ts:47](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cash_movements.ts#L47)
+Defined in: [offline/cash\_movements.ts:47](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cash_movements.ts#L47)
 
 #### Returns
 
@@ -1254,7 +1438,7 @@ Defined in: [offline/cash\_movements.ts:47](https://github.com/ASL-AL-Uroba/POS-
 
 > **getPendingOfflineCustomerCount**(): `any`
 
-Defined in: [offline/customers.ts:66](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L66)
+Defined in: [offline/customers.ts:71](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L71)
 
 #### Returns
 
@@ -1266,7 +1450,7 @@ Defined in: [offline/customers.ts:66](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **getPendingOfflineInvoiceCount**(): `any`
 
-Defined in: [offline/invoices.ts:246](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoices.ts#L246)
+Defined in: [offline/invoices.ts:246](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoices.ts#L246)
 
 #### Returns
 
@@ -1278,7 +1462,7 @@ Defined in: [offline/invoices.ts:246](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **getPendingOfflinePaymentCount**(): `any`
 
-Defined in: [offline/payments.ts:63](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/payments.ts#L63)
+Defined in: [offline/payments.ts:63](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/payments.ts#L63)
 
 #### Returns
 
@@ -1290,7 +1474,7 @@ Defined in: [offline/payments.ts:63](https://github.com/ASL-AL-Uroba/POS-Awesome
 
 > **getPrintTemplate**(): `any`
 
-Defined in: [offline/cache.ts:1214](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1214)
+Defined in: [offline/cache.ts:1888](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1888)
 
 #### Returns
 
@@ -1302,7 +1486,7 @@ Defined in: [offline/cache.ts:1214](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getQueuedPayloadCount**(`entityType`): `any`
 
-Defined in: [offline/writeQueue.ts:622](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L622)
+Defined in: [offline/writeQueue.ts:688](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L688)
 
 #### Parameters
 
@@ -1320,7 +1504,7 @@ Defined in: [offline/writeQueue.ts:622](https://github.com/ASL-AL-Uroba/POS-Awes
 
 > **getQueuedPayloadSnapshots**(`entityType`): `any`[]
 
-Defined in: [offline/writeQueue.ts:615](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L615)
+Defined in: [offline/writeQueue.ts:681](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L681)
 
 #### Parameters
 
@@ -1338,7 +1522,7 @@ Defined in: [offline/writeQueue.ts:615](https://github.com/ASL-AL-Uroba/POS-Awes
 
 > **getQueueEntries**(`entityType`, `options?`): `Promise`\<[`OfflineQueueEntry`](#offlinequeueentry)[]\>
 
-Defined in: [offline/writeQueue.ts:292](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L292)
+Defined in: [offline/writeQueue.ts:303](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L303)
 
 #### Parameters
 
@@ -1366,7 +1550,7 @@ Defined in: [offline/writeQueue.ts:292](https://github.com/ASL-AL-Uroba/POS-Awes
 
 > **getSalesPersonsStorage**(): `any`
 
-Defined in: [offline/cache.ts:850](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L850)
+Defined in: [offline/cache.ts:1520](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1520)
 
 #### Returns
 
@@ -1378,7 +1562,7 @@ Defined in: [offline/cache.ts:850](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **getStoredCustomer**(`customerName`): `Promise`\<`any`\>
 
-Defined in: [offline/customers.ts:152](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L152)
+Defined in: [offline/customers.ts:162](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L162)
 
 #### Parameters
 
@@ -1396,7 +1580,7 @@ Defined in: [offline/customers.ts:152](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **getStoredItems**(): `Promise`\<`any`\>
 
-Defined in: [offline/cache.ts:252](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L252)
+Defined in: [offline/cache.ts:707](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L707)
 
 #### Returns
 
@@ -1412,7 +1596,7 @@ Avoid unscoped reads. Prefer `getAllStoredItems(scope)` with an explicit scope.
 
 > **getStoredItemsCount**(): `Promise`\<`any`\>
 
-Defined in: [offline/cache.ts:313](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L313)
+Defined in: [offline/cache.ts:773](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L773)
 
 #### Returns
 
@@ -1424,7 +1608,7 @@ Defined in: [offline/cache.ts:313](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **getStoredItemsCountByScope**(`scope?`): `Promise`\<`any`\>
 
-Defined in: [offline/cache.ts:324](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L324)
+Defined in: [offline/cache.ts:784](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L784)
 
 #### Parameters
 
@@ -1442,7 +1626,7 @@ Defined in: [offline/cache.ts:324](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **getSyncResourceDefinitions**(): [`SyncResourceDefinition`](#syncresourcedefinition)[]
 
-Defined in: [offline/sync/resourceRegistry.ts:194](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/resourceRegistry.ts#L194)
+Defined in: [offline/sync/resourceRegistry.ts:204](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/resourceRegistry.ts#L204)
 
 Returns a shallow copy of all resource definitions with cloned `triggers` arrays.
 Callers receive mutable copies so that the frozen registry cannot be accidentally mutated.
@@ -1457,7 +1641,7 @@ Callers receive mutable copies so that the frozen registry cannot be accidentall
 
 > **getSyncResourcesByPriority**(`priority`): [`SyncResourceDefinition`](#syncresourcedefinition)[]
 
-Defined in: [offline/sync/resourceRegistry.ts:206](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/resourceRegistry.ts#L206)
+Defined in: [offline/sync/resourceRegistry.ts:216](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/resourceRegistry.ts#L216)
 
 Returns all resource definitions with the given `priority`.
 Used by `SyncCoordinator` to process resources in priority order
@@ -1479,7 +1663,7 @@ Used by `SyncCoordinator` to process resources in priority order
 
 > **getSyncResourcesForTrigger**(`trigger`): [`SyncResourceDefinition`](#syncresourcedefinition)[]
 
-Defined in: [offline/sync/resourceRegistry.ts:219](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/resourceRegistry.ts#L219)
+Defined in: [offline/sync/resourceRegistry.ts:229](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/resourceRegistry.ts#L229)
 
 Returns all resource definitions whose `triggers` array includes `trigger`.
 Used by `SyncCoordinator` at the start of each trigger run to build
@@ -1501,7 +1685,7 @@ the work list for that event.
 
 > **getSyncResourceState**(`resourceId`): `Promise`\<[`SyncResourceState`](#syncresourcestate) \| `null`\>
 
-Defined in: [offline/sync/syncState.ts:74](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/syncState.ts#L74)
+Defined in: [offline/sync/syncState.ts:74](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/syncState.ts#L74)
 
 #### Parameters
 
@@ -1519,7 +1703,7 @@ Defined in: [offline/sync/syncState.ts:74](https://github.com/ASL-AL-Uroba/POS-A
 
 > **getTaxInclusiveSetting**(): `boolean`
 
-Defined in: [offline/cache.ts:1033](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1033)
+Defined in: [offline/cache.ts:1707](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1707)
 
 #### Returns
 
@@ -1531,7 +1715,7 @@ Defined in: [offline/cache.ts:1033](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getTaxTemplate**(`name`): `any`
 
-Defined in: [offline/cache.ts:840](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L840)
+Defined in: [offline/cache.ts:1510](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1510)
 
 #### Parameters
 
@@ -1549,7 +1733,7 @@ Defined in: [offline/cache.ts:840](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **getTermsAndConditions**(): `any`
 
-Defined in: [offline/cache.ts:1234](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1234)
+Defined in: [offline/cache.ts:1908](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1908)
 
 #### Returns
 
@@ -1561,7 +1745,7 @@ Defined in: [offline/cache.ts:1234](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **getTranslationsCache**(`lang`): `any`
 
-Defined in: [offline/cache.ts:1193](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1193)
+Defined in: [offline/cache.ts:1867](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1867)
 
 #### Parameters
 
@@ -1575,11 +1759,29 @@ Defined in: [offline/cache.ts:1193](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 ***
 
+### hydrateMemoryKeys()
+
+> **hydrateMemoryKeys**(`keys`): `Promise`\<`void`\>
+
+Defined in: [offline/db.ts:530](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L530)
+
+#### Parameters
+
+##### keys
+
+readonly `string`[]
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### initializeStockCache()
 
 > **initializeStockCache**(`items`, `pos_profile`): `Promise`\<`boolean`\>
 
-Defined in: [offline/stock.ts:48](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/stock.ts#L48)
+Defined in: [offline/stock.ts:48](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/stock.ts#L48)
 
 #### Parameters
 
@@ -1601,7 +1803,7 @@ Defined in: [offline/stock.ts:48](https://github.com/ASL-AL-Uroba/POS-Awesome-V1
 
 > **isManualOffline**(): `any`
 
-Defined in: [offline/db.ts:652](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L652)
+Defined in: [offline/db.ts:1315](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1315)
 
 #### Returns
 
@@ -1613,7 +1815,7 @@ Defined in: [offline/db.ts:652](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **isOffline**(): `any`
 
-Defined in: [offline/db.ts:620](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L620)
+Defined in: [offline/db.ts:1283](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1283)
 
 #### Returns
 
@@ -1625,7 +1827,7 @@ Defined in: [offline/db.ts:620](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **isStockCacheReady**(): `any`
 
-Defined in: [offline/stock.ts:109](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/stock.ts#L109)
+Defined in: [offline/stock.ts:109](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/stock.ts#L109)
 
 #### Returns
 
@@ -1637,7 +1839,7 @@ Defined in: [offline/stock.ts:109](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **listSyncResourceStates**(): `Promise`\<[`SyncResourceState`](#syncresourcestate)[]\>
 
-Defined in: [offline/sync/syncState.ts:87](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/syncState.ts#L87)
+Defined in: [offline/sync/syncState.ts:87](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/syncState.ts#L87)
 
 #### Returns
 
@@ -1649,7 +1851,7 @@ Defined in: [offline/sync/syncState.ts:87](https://github.com/ASL-AL-Uroba/POS-A
 
 > **markWriteQueueEntryFailed**(`entityType`, `queueId`, `error`, `expectedLastAttemptAt`): `Promise`\<`any`\>
 
-Defined in: [offline/writeQueue.ts:524](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L524)
+Defined in: [offline/writeQueue.ts:584](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L584)
 
 #### Parameters
 
@@ -1679,7 +1881,7 @@ Defined in: [offline/writeQueue.ts:524](https://github.com/ASL-AL-Uroba/POS-Awes
 
 > **markWriteQueueEntrySynced**(`entityType`, `queueId`, `expectedLastAttemptAt`): `Promise`\<`any`\>
 
-Defined in: [offline/writeQueue.ts:503](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L503)
+Defined in: [offline/writeQueue.ts:521](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L521)
 
 #### Parameters
 
@@ -1701,11 +1903,33 @@ Defined in: [offline/writeQueue.ts:503](https://github.com/ASL-AL-Uroba/POS-Awes
 
 ***
 
+### markWriteQueueEntrySyncedByIdempotencyKey()
+
+> **markWriteQueueEntrySyncedByIdempotencyKey**(`entityType`, `idempotencyKey`): `Promise`\<`any`\>
+
+Defined in: [offline/writeQueue.ts:543](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L543)
+
+#### Parameters
+
+##### entityType
+
+[`OfflineEntityType`](#offlineentitytype)
+
+##### idempotencyKey
+
+`string`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
 ### mergeCachedPriceListItems()
 
 > **mergeCachedPriceListItems**(`priceList`, `items?`): `void`
 
-Defined in: [offline/cache.ts:587](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L587)
+Defined in: [offline/cache.ts:1133](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1133)
 
 #### Parameters
 
@@ -1727,7 +1951,7 @@ Defined in: [offline/cache.ts:587](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **migrateLegacyOfflineQueues**(): `Promise`\<`void`\>
 
-Defined in: [offline/writeQueue.ts:581](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L581)
+Defined in: [offline/writeQueue.ts:644](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L644)
 
 #### Returns
 
@@ -1739,7 +1963,7 @@ Defined in: [offline/writeQueue.ts:581](https://github.com/ASL-AL-Uroba/POS-Awes
 
 > **persist**(`key`, `value?`): `void`
 
-Defined in: [offline/db.ts:577](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L577)
+Defined in: [offline/db.ts:1267](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1267)
 
 #### Parameters
 
@@ -1757,11 +1981,61 @@ Defined in: [offline/db.ts:577](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 ***
 
+### persistInvoiceIntentJournal()
+
+> **persistInvoiceIntentJournal**(`entry`): `string`
+
+Defined in: [offline/invoiceOutbox.ts:102](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L102)
+
+#### Parameters
+
+##### entry
+
+`AnyRecord`
+
+#### Returns
+
+`string`
+
+***
+
+### promoteItemCatalogGeneration()
+
+> **promoteItemCatalogGeneration**(`scope`, `generation`, `options?`): `Promise`\<\{ `generation`: `string`; `previousGeneration`: `string`; `rowCount`: `number`; \}\>
+
+Defined in: [offline/cache.ts:558](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L558)
+
+#### Parameters
+
+##### scope
+
+`string`
+
+##### generation
+
+`string`
+
+##### options?
+
+###### allowEmpty?
+
+`boolean`
+
+###### expectedCount?
+
+`number`
+
+#### Returns
+
+`Promise`\<\{ `generation`: `string`; `previousGeneration`: `string`; `rowCount`: `number`; \}\>
+
+***
+
 ### pruneOfflineStorage()
 
 > **pruneOfflineStorage**(`options?`): `Promise`\<[`OfflinePruneResult`](#offlinepruneresult)\>
 
-Defined in: [offline/db.ts:478](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L478)
+Defined in: [offline/db.ts:1221](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1221)
 
 #### Parameters
 
@@ -1783,13 +2057,25 @@ Defined in: [offline/db.ts:478](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 ### purgeOldQueueEntries()
 
-> **purgeOldQueueEntries**(): `void`
+> **purgeOldQueueEntries**(`options?`): `number`
 
-Defined in: [offline/db.ts:825](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L825)
+Defined in: [offline/db.ts:1596](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1596)
+
+#### Parameters
+
+##### options?
+
+###### maxAgeDays?
+
+`number`
+
+###### now?
+
+`number`
 
 #### Returns
 
-`void`
+`number`
 
 ***
 
@@ -1797,7 +2083,7 @@ Defined in: [offline/db.ts:825](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **queueHealthCheck**(): `boolean`
 
-Defined in: [offline/db.ts:815](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L815)
+Defined in: [offline/db.ts:1549](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1549)
 
 #### Returns
 
@@ -1809,7 +2095,7 @@ Defined in: [offline/db.ts:815](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **quickDbHealthCheck**(): `Promise`\<`boolean`\>
 
-Defined in: [offline/db.ts:772](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L772)
+Defined in: [offline/db.ts:1435](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1435)
 
 #### Returns
 
@@ -1821,7 +2107,7 @@ Defined in: [offline/db.ts:772](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **reduceCacheUsage**(): `void`
 
-Defined in: [offline/cache.ts:1056](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1056)
+Defined in: [offline/cache.ts:1730](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1730)
 
 Clears all `memory`-tier caches to free up localStorage space under memory pressure.
 
@@ -1843,7 +2129,7 @@ the relevant sync adapter re-populates the cache.
 
 > **refreshAllQueueMemory**(): `Promise`\<`void`\>
 
-Defined in: [offline/writeQueue.ts:325](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L325)
+Defined in: [offline/writeQueue.ts:336](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L336)
 
 #### Returns
 
@@ -1855,7 +2141,7 @@ Defined in: [offline/writeQueue.ts:325](https://github.com/ASL-AL-Uroba/POS-Awes
 
 > **refreshBootstrapSnapshotFromCacheState**(`cacheState?`): `void`
 
-Defined in: [offline/cache.ts:888](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L888)
+Defined in: [offline/cache.ts:1558](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1558)
 
 Re-evaluates the stored bootstrap snapshot against the current cache state and
 persists the updated snapshot.
@@ -1884,7 +2170,7 @@ Partial cache state describing what was just written.
 
 > **refreshQueueMemory**(`entityType`): `Promise`\<`void`\>
 
-Defined in: [offline/writeQueue.ts:318](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L318)
+Defined in: [offline/writeQueue.ts:329](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L329)
 
 #### Parameters
 
@@ -1898,11 +2184,29 @@ Defined in: [offline/writeQueue.ts:318](https://github.com/ASL-AL-Uroba/POS-Awes
 
 ***
 
+### registerPostHydrationTask()
+
+> **registerPostHydrationTask**(`task`): () => `boolean`
+
+Defined in: [offline/db.ts:648](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L648)
+
+#### Parameters
+
+##### task
+
+`PostHydrationTask`
+
+#### Returns
+
+() => `boolean`
+
+***
+
 ### removeCachedPriceListItems()
 
 > **removeCachedPriceListItems**(`itemCodes?`, `priceList?`): `void`
 
-Defined in: [offline/cache.ts:630](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L630)
+Defined in: [offline/cache.ts:1176](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1176)
 
 #### Parameters
 
@@ -1920,11 +2224,47 @@ Defined in: [offline/cache.ts:630](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 ***
 
+### removeInvoiceIntentJournal()
+
+> **removeInvoiceIntentJournal**(`clientRequestId`): `void`
+
+Defined in: [offline/invoiceOutbox.ts:117](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L117)
+
+#### Parameters
+
+##### clientRequestId
+
+`string`
+
+#### Returns
+
+`void`
+
+***
+
+### removeInvoiceOutboxEntry()
+
+> **removeInvoiceOutboxEntry**(`clientRequestId`): `Promise`\<`any`\>
+
+Defined in: [offline/invoiceOutbox.ts:208](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L208)
+
+#### Parameters
+
+##### clientRequestId
+
+`string`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
 ### removeItemDetailsCacheEntries()
 
 > **removeItemDetailsCacheEntries**(`profileName`, `itemCodes?`, `priceList?`): `void`
 
-Defined in: [offline/cache.ts:776](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L776)
+Defined in: [offline/cache.ts:1446](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1446)
 
 #### Parameters
 
@@ -1950,7 +2290,7 @@ Defined in: [offline/cache.ts:776](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **removeLocalStockEntries**(`itemCodes`): `void`
 
-Defined in: [offline/stock.ts:187](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/stock.ts#L187)
+Defined in: [offline/stock.ts:187](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/stock.ts#L187)
 
 #### Parameters
 
@@ -1968,7 +2308,7 @@ Defined in: [offline/stock.ts:187](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **repairDbAfterFailedHealthCheck**(`error?`): `Promise`\<`boolean`\>
 
-Defined in: [offline/db.ts:785](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L785)
+Defined in: [offline/db.ts:1448](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1448)
 
 #### Parameters
 
@@ -1986,7 +2326,7 @@ Defined in: [offline/db.ts:785](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **resetOfflineState**(): `void`
 
-Defined in: [offline/invoices.ts:250](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoices.ts#L250)
+Defined in: [offline/invoices.ts:250](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoices.ts#L250)
 
 #### Returns
 
@@ -1998,7 +2338,7 @@ Defined in: [offline/invoices.ts:250](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **resetSyncCoordinatorForTests**(): `void`
 
-Defined in: [offline/sync/useSyncCoordinator.ts:15](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/useSyncCoordinator.ts#L15)
+Defined in: [offline/sync/useSyncCoordinator.ts:15](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/useSyncCoordinator.ts#L15)
 
 #### Returns
 
@@ -2010,7 +2350,7 @@ Defined in: [offline/sync/useSyncCoordinator.ts:15](https://github.com/ASL-AL-Ur
 
 > **safeBulkDelete**(`tableName`, `keys`): `Promise`\<`void`\>
 
-Defined in: [offline/db.ts:447](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L447)
+Defined in: [offline/db.ts:1040](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1040)
 
 #### Parameters
 
@@ -2032,7 +2372,7 @@ Defined in: [offline/db.ts:447](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **safeBulkPut**\<`T`\>(`tableName`, `rows`): `Promise`\<`void`\>
 
-Defined in: [offline/db.ts:421](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L421)
+Defined in: [offline/db.ts:718](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L718)
 
 #### Type Parameters
 
@@ -2060,7 +2400,7 @@ Defined in: [offline/db.ts:421](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **saveCoupons**(`coupons`): `void`
 
-Defined in: [offline/cache.ts:1255](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1255)
+Defined in: [offline/cache.ts:1929](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1929)
 
 #### Parameters
 
@@ -2078,7 +2418,7 @@ Defined in: [offline/cache.ts:1255](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **saveCurrencyOptionsCache**(`profileName`, `currencies`): `void`
 
-Defined in: [offline/cache.ts:1354](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1354)
+Defined in: [offline/cache.ts:2029](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L2029)
 
 #### Parameters
 
@@ -2100,7 +2440,7 @@ Defined in: [offline/cache.ts:1354](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **saveCustomerAddressesCache**(`customer`, `addresses`): `void`
 
-Defined in: [offline/cache.ts:1482](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1482)
+Defined in: [offline/cache.ts:2159](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L2159)
 
 #### Parameters
 
@@ -2122,7 +2462,7 @@ Defined in: [offline/cache.ts:1482](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **saveCustomerBalance**(`customer`, `balance`, `currency?`): `void`
 
-Defined in: [offline/customers.ts:364](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L364)
+Defined in: [offline/customers.ts:434](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L434)
 
 #### Parameters
 
@@ -2148,7 +2488,7 @@ Defined in: [offline/customers.ts:364](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **saveDeliveryChargesCache**(`profileName`, `customer`, `deliveryCharges`): `void`
 
-Defined in: [offline/cache.ts:1310](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1310)
+Defined in: [offline/cache.ts:1984](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1984)
 
 #### Parameters
 
@@ -2174,7 +2514,7 @@ Defined in: [offline/cache.ts:1310](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **saveExchangeRateCache**(`entry?`): `void`
 
-Defined in: [offline/cache.ts:1393](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1393)
+Defined in: [offline/cache.ts:2069](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L2069)
 
 #### Parameters
 
@@ -2192,7 +2532,7 @@ Defined in: [offline/cache.ts:1393](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **saveGiftCardSnapshot**(`giftCardCode`, `snapshot`): `void`
 
-Defined in: [offline/customers.ts:320](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L320)
+Defined in: [offline/customers.ts:383](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L383)
 
 #### Parameters
 
@@ -2214,7 +2554,7 @@ Defined in: [offline/customers.ts:320](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **saveItemDetailsCache**(`profileName`, `priceList`, `items`): `void`
 
-Defined in: [offline/cache.ts:670](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L670)
+Defined in: [offline/cache.ts:1217](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1217)
 
 #### Parameters
 
@@ -2240,7 +2580,7 @@ Defined in: [offline/cache.ts:670](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **saveItemGroups**(`groups`): `void`
 
-Defined in: [offline/cache.ts:1280](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1280)
+Defined in: [offline/cache.ts:1954](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1954)
 
 #### Parameters
 
@@ -2258,7 +2598,7 @@ Defined in: [offline/cache.ts:1280](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **saveItems**(`items`, `scope?`): `Promise`\<`void`\>
 
-Defined in: [offline/cache.ts:359](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L359)
+Defined in: [offline/cache.ts:824](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L824)
 
 #### Parameters
 
@@ -2280,7 +2620,7 @@ Defined in: [offline/cache.ts:359](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **saveItemsBulk**(`items`, `scope?`): `Promise`\<`void`\>
 
-Defined in: [offline/cache.ts:355](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L355)
+Defined in: [offline/cache.ts:820](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L820)
 
 #### Parameters
 
@@ -2302,7 +2642,7 @@ Defined in: [offline/cache.ts:355](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **saveItemUOMs**(`itemCode`, `uoms`): `void`
 
-Defined in: [offline/cache.ts:458](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L458)
+Defined in: [offline/cache.ts:955](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L955)
 
 #### Parameters
 
@@ -2324,7 +2664,7 @@ Defined in: [offline/cache.ts:458](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **saveOffers**(`offers`): `void`
 
-Defined in: [offline/cache.ts:479](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L479)
+Defined in: [offline/cache.ts:976](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L976)
 
 #### Parameters
 
@@ -2342,7 +2682,7 @@ Defined in: [offline/cache.ts:479](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **saveOfflineCashMovement**(`entry`): `Promise`\<`any`\>
 
-Defined in: [offline/cash\_movements.ts:23](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cash_movements.ts#L23)
+Defined in: [offline/cash\_movements.ts:23](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cash_movements.ts#L23)
 
 #### Parameters
 
@@ -2360,7 +2700,7 @@ Defined in: [offline/cash\_movements.ts:23](https://github.com/ASL-AL-Uroba/POS-
 
 > **saveOfflineCustomer**(`entry`): `Promise`\<`any`\>
 
-Defined in: [offline/customers.ts:20](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L20)
+Defined in: [offline/customers.ts:25](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L25)
 
 #### Parameters
 
@@ -2378,7 +2718,7 @@ Defined in: [offline/customers.ts:20](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **saveOfflineInvoice**(`entry`): `Promise`\<`any`\>
 
-Defined in: [offline/invoices.ts:214](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoices.ts#L214)
+Defined in: [offline/invoices.ts:214](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoices.ts#L214)
 
 #### Parameters
 
@@ -2396,7 +2736,7 @@ Defined in: [offline/invoices.ts:214](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **saveOfflinePayment**(`entry`): `Promise`\<`any`\>
 
-Defined in: [offline/payments.ts:41](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/payments.ts#L41)
+Defined in: [offline/payments.ts:41](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/payments.ts#L41)
 
 #### Parameters
 
@@ -2414,7 +2754,7 @@ Defined in: [offline/payments.ts:41](https://github.com/ASL-AL-Uroba/POS-Awesome
 
 > **savePaymentMethodCurrencyCache**(`company`, `mapping`): `void`
 
-Defined in: [offline/cache.ts:1522](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1522)
+Defined in: [offline/cache.ts:2199](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L2199)
 
 #### Parameters
 
@@ -2436,7 +2776,7 @@ Defined in: [offline/cache.ts:1522](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **savePriceListItems**(`priceList`, `items`): `void`
 
-Defined in: [offline/cache.ts:540](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L540)
+Defined in: [offline/cache.ts:1056](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1056)
 
 #### Parameters
 
@@ -2458,7 +2798,7 @@ Defined in: [offline/cache.ts:540](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **savePriceListMetaCache**(`profileName`, `metadata`): `void`
 
-Defined in: [offline/cache.ts:1443](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1443)
+Defined in: [offline/cache.ts:2120](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L2120)
 
 #### Parameters
 
@@ -2480,7 +2820,7 @@ Defined in: [offline/cache.ts:1443](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **savePricingRulesSnapshot**(`snapshot?`, `context?`, `staleAt?`): `void`
 
-Defined in: [offline/cache.ts:1146](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1146)
+Defined in: [offline/cache.ts:1820](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1820)
 
 #### Parameters
 
@@ -2506,7 +2846,7 @@ Defined in: [offline/cache.ts:1146](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **saveStoredValueSnapshot**(`customer`, `company`, `sources`): `void`
 
-Defined in: [offline/customers.ts:263](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L263)
+Defined in: [offline/customers.ts:322](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L322)
 
 #### Parameters
 
@@ -2532,7 +2872,7 @@ Defined in: [offline/customers.ts:263](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **saveTaxTemplate**(`name`, `doc`): `void`
 
-Defined in: [offline/cache.ts:826](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L826)
+Defined in: [offline/cache.ts:1496](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1496)
 
 #### Parameters
 
@@ -2554,7 +2894,7 @@ Defined in: [offline/cache.ts:826](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **saveTranslationsCache**(`lang`, `data`): `void`
 
-Defined in: [offline/cache.ts:1203](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1203)
+Defined in: [offline/cache.ts:1877](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1877)
 
 #### Parameters
 
@@ -2576,7 +2916,7 @@ Defined in: [offline/cache.ts:1203](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **scheduleIdleOfflinePruning**(): `void`
 
-Defined in: [offline/db.ts:560](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L560)
+Defined in: [offline/db.ts:1250](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1250)
 
 #### Returns
 
@@ -2588,7 +2928,7 @@ Defined in: [offline/db.ts:560](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **searchStoredItems**(`__namedParameters?`): `Promise`\<`any`\>
 
-Defined in: [offline/cache.ts:263](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L263)
+Defined in: [offline/cache.ts:718](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L718)
 
 #### Parameters
 
@@ -2624,7 +2964,7 @@ Defined in: [offline/cache.ts:263](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **setBootstrapLimitedMode**(`state`): `void`
 
-Defined in: [offline/cache.ts:932](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L932)
+Defined in: [offline/cache.ts:1605](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1605)
 
 #### Parameters
 
@@ -2642,7 +2982,7 @@ Defined in: [offline/cache.ts:932](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **setBootstrapSnapshot**(`snapshot`): `void`
 
-Defined in: [offline/cache.ts:901](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L901)
+Defined in: [offline/cache.ts:1574](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1574)
 
 #### Parameters
 
@@ -2660,7 +3000,7 @@ Defined in: [offline/cache.ts:901](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **setBootstrapSnapshotStatus**(`status`): `void`
 
-Defined in: [offline/cache.ts:917](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L917)
+Defined in: [offline/cache.ts:1590](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1590)
 
 #### Parameters
 
@@ -2678,7 +3018,7 @@ Defined in: [offline/cache.ts:917](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **setCustomersLastSync**(`timestamp`): `void`
 
-Defined in: [offline/cache.ts:1103](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1103)
+Defined in: [offline/cache.ts:1777](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1777)
 
 #### Parameters
 
@@ -2696,7 +3036,7 @@ Defined in: [offline/cache.ts:1103](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **setCustomerStorage**(`customers`): `Promise`\<`void`\>
 
-Defined in: [offline/customers.ts:177](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L177)
+Defined in: [offline/customers.ts:189](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L189)
 
 #### Parameters
 
@@ -2714,7 +3054,7 @@ Defined in: [offline/customers.ts:177](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **setInvoiceOutboxMode**(`mode`): `void`
 
-Defined in: [offline/invoiceOutbox.ts:70](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L70)
+Defined in: [offline/invoiceOutbox.ts:80](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L80)
 
 #### Parameters
 
@@ -2732,7 +3072,7 @@ Defined in: [offline/invoiceOutbox.ts:70](https://github.com/ASL-AL-Uroba/POS-Aw
 
 > **setItemsLastSync**(`timestamp`): `void`
 
-Defined in: [offline/cache.ts:1094](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1094)
+Defined in: [offline/cache.ts:1768](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1768)
 
 #### Parameters
 
@@ -2750,7 +3090,7 @@ Defined in: [offline/cache.ts:1094](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **setLastSyncTotals**(`totals`): `void`
 
-Defined in: [offline/invoices.ts:258](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoices.ts#L258)
+Defined in: [offline/invoices.ts:258](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoices.ts#L258)
 
 #### Parameters
 
@@ -2778,7 +3118,7 @@ Defined in: [offline/invoices.ts:258](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **setLocalStockCache**(`cache`): `void`
 
-Defined in: [offline/stock.ts:258](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/stock.ts#L258)
+Defined in: [offline/stock.ts:258](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/stock.ts#L258)
 
 #### Parameters
 
@@ -2796,7 +3136,7 @@ Defined in: [offline/stock.ts:258](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **setManualOffline**(`state`): `void`
 
-Defined in: [offline/db.ts:656](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L656)
+Defined in: [offline/db.ts:1319](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1319)
 
 #### Parameters
 
@@ -2814,7 +3154,7 @@ Defined in: [offline/db.ts:656](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **setOpeningDialogStorage**(`data`): `void`
 
-Defined in: [offline/cache.ts:1024](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1024)
+Defined in: [offline/cache.ts:1698](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1698)
 
 #### Parameters
 
@@ -2832,7 +3172,7 @@ Defined in: [offline/cache.ts:1024](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **setOpeningStorage**(`data`): `void`
 
-Defined in: [offline/cache.ts:995](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L995)
+Defined in: [offline/cache.ts:1667](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1667)
 
 #### Parameters
 
@@ -2850,7 +3190,7 @@ Defined in: [offline/cache.ts:995](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **setPrintTemplate**(`template`): `void`
 
-Defined in: [offline/cache.ts:1222](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1222)
+Defined in: [offline/cache.ts:1896](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1896)
 
 #### Parameters
 
@@ -2864,11 +3204,33 @@ Defined in: [offline/cache.ts:1222](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 ***
 
+### setProfileBuyingPriceList()
+
+> **setProfileBuyingPriceList**(`profile`, `buyingPriceList`): `Promise`\<`void`\>
+
+Defined in: [offline/cache.ts:1362](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1362)
+
+#### Parameters
+
+##### profile
+
+`any`
+
+##### buyingPriceList
+
+`string` \| `null` \| `undefined`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### setSalesPersonsStorage()
 
 > **setSalesPersonsStorage**(`data`): `void`
 
-Defined in: [offline/cache.ts:854](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L854)
+Defined in: [offline/cache.ts:1524](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1524)
 
 #### Parameters
 
@@ -2886,7 +3248,7 @@ Defined in: [offline/cache.ts:854](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **setStockCacheReady**(`ready`): `void`
 
-Defined in: [offline/stock.ts:113](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/stock.ts#L113)
+Defined in: [offline/stock.ts:113](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/stock.ts#L113)
 
 #### Parameters
 
@@ -2904,7 +3266,7 @@ Defined in: [offline/stock.ts:113](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **setSyncResourceState**(`state`): `Promise`\<`void`\>
 
-Defined in: [offline/sync/syncState.ts:41](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/syncState.ts#L41)
+Defined in: [offline/sync/syncState.ts:41](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/syncState.ts#L41)
 
 #### Parameters
 
@@ -2922,7 +3284,7 @@ Defined in: [offline/sync/syncState.ts:41](https://github.com/ASL-AL-Uroba/POS-A
 
 > **setSyncResourceStates**(`states`): `Promise`\<`void`\>
 
-Defined in: [offline/sync/syncState.ts:58](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/syncState.ts#L58)
+Defined in: [offline/sync/syncState.ts:58](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/syncState.ts#L58)
 
 #### Parameters
 
@@ -2940,7 +3302,7 @@ Defined in: [offline/sync/syncState.ts:58](https://github.com/ASL-AL-Uroba/POS-A
 
 > **setTaxInclusiveSetting**(`value`): `void`
 
-Defined in: [offline/cache.ts:1037](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1037)
+Defined in: [offline/cache.ts:1711](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1711)
 
 #### Parameters
 
@@ -2958,7 +3320,7 @@ Defined in: [offline/cache.ts:1037](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **setTermsAndConditions**(`terms`): `void`
 
-Defined in: [offline/cache.ts:1242](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L1242)
+Defined in: [offline/cache.ts:1916](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1916)
 
 #### Parameters
 
@@ -2976,7 +3338,7 @@ Defined in: [offline/cache.ts:1242](https://github.com/ASL-AL-Uroba/POS-Awesome-
 
 > **shouldWriteInvoiceOutbox**(): `boolean`
 
-Defined in: [offline/invoiceOutbox.ts:75](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L75)
+Defined in: [offline/invoiceOutbox.ts:85](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L85)
 
 #### Returns
 
@@ -2984,11 +3346,37 @@ Defined in: [offline/invoiceOutbox.ts:75](https://github.com/ASL-AL-Uroba/POS-Aw
 
 ***
 
+### stageItemCatalogRows()
+
+> **stageItemCatalogRows**(`items`, `scope`, `generation`): `Promise`\<`number`\>
+
+Defined in: [offline/cache.ts:500](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L500)
+
+#### Parameters
+
+##### items
+
+`Record`\<`string`, `any`\>[]
+
+##### scope
+
+`string`
+
+##### generation
+
+`string`
+
+#### Returns
+
+`Promise`\<`number`\>
+
+***
+
 ### syncBootstrapConfigResource()
 
 > **syncBootstrapConfigResource**(`args`): `Promise`\<`ResourceSyncResult`\>
 
-Defined in: [offline/sync/adapters/bootstrapConfig.ts:48](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/adapters/bootstrapConfig.ts#L48)
+Defined in: [offline/sync/adapters/bootstrapConfig.ts:48](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/adapters/bootstrapConfig.ts#L48)
 
 #### Parameters
 
@@ -3006,7 +3394,7 @@ Defined in: [offline/sync/adapters/bootstrapConfig.ts:48](https://github.com/ASL
 
 > **syncCurrencyMatrixResource**(`args`): `Promise`\<`ResourceSyncResult`\>
 
-Defined in: [offline/sync/adapters/currencyMatrix.ts:34](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/adapters/currencyMatrix.ts#L34)
+Defined in: [offline/sync/adapters/currencyMatrix.ts:39](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/adapters/currencyMatrix.ts#L39)
 
 #### Parameters
 
@@ -3024,7 +3412,7 @@ Defined in: [offline/sync/adapters/currencyMatrix.ts:34](https://github.com/ASL-
 
 > **syncCustomersResource**(`args`): `Promise`\<`ResourceSyncResult`\>
 
-Defined in: [offline/sync/adapters/customers.ts:135](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/adapters/customers.ts#L135)
+Defined in: [offline/sync/adapters/customers.ts:172](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/adapters/customers.ts#L172)
 
 #### Parameters
 
@@ -3042,7 +3430,7 @@ Defined in: [offline/sync/adapters/customers.ts:135](https://github.com/ASL-AL-U
 
 > **syncInvoiceOutboxResource**(`callOfflineSyncMethod`): `Promise`\<\{ `acknowledged`: `number`; `consecutiveFailures`: `number`; `lastError`: `string` \| `null`; `lastSyncedAt`: `string`; `pendingCount`: `number`; `resourceId`: `string`; `status`: `string`; `watermark`: `string`; \}\>
 
-Defined in: [offline/invoiceOutbox.ts:198](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L198)
+Defined in: [offline/invoiceOutbox.ts:278](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L278)
 
 #### Parameters
 
@@ -3056,11 +3444,29 @@ Defined in: [offline/invoiceOutbox.ts:198](https://github.com/ASL-AL-Uroba/POS-A
 
 ***
 
+### syncItemPricesResource()
+
+> **syncItemPricesResource**(`args`): `Promise`\<`ResourceSyncResult`\>
+
+Defined in: [offline/sync/adapters/itemPrices.ts:37](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/adapters/itemPrices.ts#L37)
+
+#### Parameters
+
+##### args
+
+`ItemPricesSyncArgs`
+
+#### Returns
+
+`Promise`\<`ResourceSyncResult`\>
+
+***
+
 ### syncItemsResource()
 
 > **syncItemsResource**(`args`): `Promise`\<`ResourceSyncResult`\>
 
-Defined in: [offline/sync/adapters/items.ts:95](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/adapters/items.ts#L95)
+Defined in: [offline/sync/adapters/items.ts:279](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/adapters/items.ts#L279)
 
 #### Parameters
 
@@ -3078,7 +3484,7 @@ Defined in: [offline/sync/adapters/items.ts:95](https://github.com/ASL-AL-Uroba/
 
 > **syncOfflineCashMovements**(): `Promise`\<\{ `pending`: `any`; `synced`: `number`; \}\>
 
-Defined in: [offline/cash\_movements.ts:72](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cash_movements.ts#L72)
+Defined in: [offline/cash\_movements.ts:72](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cash_movements.ts#L72)
 
 #### Returns
 
@@ -3090,7 +3496,7 @@ Defined in: [offline/cash\_movements.ts:72](https://github.com/ASL-AL-Uroba/POS-
 
 > **syncOfflineCustomers**(): `Promise`\<\{ `pending`: `any`; `synced`: `number`; \}\>
 
-Defined in: [offline/customers.ts:70](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L70)
+Defined in: [offline/customers.ts:75](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L75)
 
 #### Returns
 
@@ -3102,7 +3508,7 @@ Defined in: [offline/customers.ts:70](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **syncOfflineInvoices**(): `Promise`\<\{ `drafted`: `number`; `pending`: `any`; `synced`: `number`; \}\>
 
-Defined in: [offline/invoices.ts:271](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoices.ts#L271)
+Defined in: [offline/invoices.ts:271](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoices.ts#L271)
 
 #### Returns
 
@@ -3114,7 +3520,7 @@ Defined in: [offline/invoices.ts:271](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **syncOfflinePayments**(): `Promise`\<\{ `pending`: `any`; `synced`: `number`; \}\>
 
-Defined in: [offline/payments.ts:67](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/payments.ts#L67)
+Defined in: [offline/payments.ts:67](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/payments.ts#L67)
 
 #### Returns
 
@@ -3126,7 +3532,7 @@ Defined in: [offline/payments.ts:67](https://github.com/ASL-AL-Uroba/POS-Awesome
 
 > **syncPaymentMethodCurrenciesResource**(`args`): `Promise`\<`ResourceSyncResult`\>
 
-Defined in: [offline/sync/adapters/paymentMethodCurrencies.ts:24](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/adapters/paymentMethodCurrencies.ts#L24)
+Defined in: [offline/sync/adapters/paymentMethodCurrencies.ts:24](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/adapters/paymentMethodCurrencies.ts#L24)
 
 #### Parameters
 
@@ -3144,7 +3550,7 @@ Defined in: [offline/sync/adapters/paymentMethodCurrencies.ts:24](https://github
 
 > **syncPriceListMetaResource**(`args`): `Promise`\<`ResourceSyncResult`\>
 
-Defined in: [offline/sync/adapters/bootstrapConfig.ts:92](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/adapters/bootstrapConfig.ts#L92)
+Defined in: [offline/sync/adapters/bootstrapConfig.ts:92](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/adapters/bootstrapConfig.ts#L92)
 
 #### Parameters
 
@@ -3158,11 +3564,29 @@ Defined in: [offline/sync/adapters/bootstrapConfig.ts:92](https://github.com/ASL
 
 ***
 
+### syncPricingRulesResource()
+
+> **syncPricingRulesResource**(`args`): `Promise`\<`ResourceSyncResult`\>
+
+Defined in: [offline/sync/adapters/pricingRules.ts:80](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/adapters/pricingRules.ts#L80)
+
+#### Parameters
+
+##### args
+
+`PricingRulesSyncArgs`
+
+#### Returns
+
+`Promise`\<`ResourceSyncResult`\>
+
+***
+
 ### syncStockResource()
 
 > **syncStockResource**(`args`): `Promise`\<`ResourceSyncResult`\>
 
-Defined in: [offline/sync/adapters/stock.ts:55](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/adapters/stock.ts#L55)
+Defined in: [offline/sync/adapters/stock.ts:55](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/adapters/stock.ts#L55)
 
 #### Parameters
 
@@ -3180,7 +3604,7 @@ Defined in: [offline/sync/adapters/stock.ts:55](https://github.com/ASL-AL-Uroba/
 
 > **toggleManualOffline**(): `void`
 
-Defined in: [offline/db.ts:661](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L661)
+Defined in: [offline/db.ts:1324](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1324)
 
 #### Returns
 
@@ -3192,7 +3616,7 @@ Defined in: [offline/db.ts:661](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **updateLocalStock**(`items`): `void`
 
-Defined in: [offline/stock.ts:121](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/stock.ts#L121)
+Defined in: [offline/stock.ts:121](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/stock.ts#L121)
 
 #### Parameters
 
@@ -3210,7 +3634,7 @@ Defined in: [offline/stock.ts:121](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **updateLocalStockCache**(`items`): `void`
 
-Defined in: [offline/stock.ts:159](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/stock.ts#L159)
+Defined in: [offline/stock.ts:159](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/stock.ts#L159)
 
 #### Parameters
 
@@ -3228,7 +3652,7 @@ Defined in: [offline/stock.ts:159](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **updateLocalStockWithActualQuantities**(`invoiceItems`, `serverItems`): `void`
 
-Defined in: [offline/stock.ts:210](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/stock.ts#L210)
+Defined in: [offline/stock.ts:210](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/stock.ts#L210)
 
 #### Parameters
 
@@ -3250,7 +3674,7 @@ Defined in: [offline/stock.ts:210](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 
 > **updateOfflineInvoicesCustomer**(`oldName`, `newName`): `Promise`\<`void`\>
 
-Defined in: [offline/customers.ts:32](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/customers.ts#L32)
+Defined in: [offline/customers.ts:37](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/customers.ts#L37)
 
 #### Parameters
 
@@ -3272,7 +3696,7 @@ Defined in: [offline/customers.ts:32](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **updateQueuedPayloads**(`entityType`, `updater`): `Promise`\<`void`\>
 
-Defined in: [offline/writeQueue.ts:553](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L553)
+Defined in: [offline/writeQueue.ts:613](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L613)
 
 #### Parameters
 
@@ -3294,7 +3718,7 @@ Defined in: [offline/writeQueue.ts:553](https://github.com/ASL-AL-Uroba/POS-Awes
 
 > **useSyncCoordinator**(): [`SyncCoordinator`](#synccoordinator)
 
-Defined in: [offline/sync/useSyncCoordinator.ts:8](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/useSyncCoordinator.ts#L8)
+Defined in: [offline/sync/useSyncCoordinator.ts:8](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/useSyncCoordinator.ts#L8)
 
 #### Returns
 
@@ -3306,7 +3730,7 @@ Defined in: [offline/sync/useSyncCoordinator.ts:8](https://github.com/ASL-AL-Uro
 
 > **validateStockForOfflineInvoice**(`items`, `invoice?`): `object`
 
-Defined in: [offline/invoices.ts:62](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoices.ts#L62)
+Defined in: [offline/invoices.ts:62](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoices.ts#L62)
 
 #### Parameters
 
@@ -3340,7 +3764,7 @@ Defined in: [offline/invoices.ts:62](https://github.com/ASL-AL-Uroba/POS-Awesome
 
 > **withDbTransaction**\<`T`\>(`mode`, `tableNames`, `callback`): `Promise`\<`T`\>
 
-Defined in: [offline/db.ts:410](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L410)
+Defined in: [offline/db.ts:707](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L707)
 
 #### Type Parameters
 
@@ -3366,11 +3790,39 @@ Defined in: [offline/db.ts:410](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 `Promise`\<`T`\>
 
+***
+
+### withItemCatalogRefreshLock()
+
+> **withItemCatalogRefreshLock**\<`T`\>(`scope`, `task`): `Promise`\<`T`\>
+
+Defined in: [offline/cache.ts:423](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L423)
+
+#### Type Parameters
+
+##### T
+
+`T`
+
+#### Parameters
+
+##### scope
+
+`string`
+
+##### task
+
+() => `Promise`\<`T`\>
+
+#### Returns
+
+`Promise`\<`T`\>
+
 ## Classes
 
 ### SyncCoordinator
 
-Defined in: [offline/sync/SyncCoordinator.ts:109](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/SyncCoordinator.ts#L109)
+Defined in: [offline/sync/SyncCoordinator.ts:109](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/SyncCoordinator.ts#L109)
 
 Orchestrates offline background synchronisation for all registered resources.
 
@@ -3393,7 +3845,7 @@ coordinator.runTrigger("boot");
 
 > **new SyncCoordinator**(`options?`): [`SyncCoordinator`](#synccoordinator)
 
-Defined in: [offline/sync/SyncCoordinator.ts:128](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/SyncCoordinator.ts#L128)
+Defined in: [offline/sync/SyncCoordinator.ts:128](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/SyncCoordinator.ts#L128)
 
 ###### Parameters
 
@@ -3411,7 +3863,7 @@ Defined in: [offline/sync/SyncCoordinator.ts:128](https://github.com/ASL-AL-Urob
 
 > **getLastRunSummary**(): `any`
 
-Defined in: [offline/sync/SyncCoordinator.ts:166](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/SyncCoordinator.ts#L166)
+Defined in: [offline/sync/SyncCoordinator.ts:166](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/SyncCoordinator.ts#L166)
 
 ###### Returns
 
@@ -3421,7 +3873,7 @@ Defined in: [offline/sync/SyncCoordinator.ts:166](https://github.com/ASL-AL-Urob
 
 > **getResourceState**(`resourceId`): \{ `consecutiveFailures`: `number`; `cooldownMs?`: `number` \| `null`; `lastAttemptAt?`: `string` \| `null`; `lastError`: `string` \| `null`; `lastSuccessHash`: `string` \| `null`; `lastSyncedAt`: `string` \| `null`; `lastTrigger?`: [`SyncTrigger`](#synctrigger) \| `null`; `nextRetryAt?`: `string` \| `null`; `resourceId`: [`SyncResourceId`](#syncresourceid); `schemaVersion`: `string` \| `null`; `scopeSignature`: `string` \| `null`; `status`: [`SyncLifecycleState`](#synclifecyclestate); `watermark`: `string` \| `null`; \} \| `null`
 
-Defined in: [offline/sync/SyncCoordinator.ts:152](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/SyncCoordinator.ts#L152)
+Defined in: [offline/sync/SyncCoordinator.ts:152](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/SyncCoordinator.ts#L152)
 
 Returns a snapshot of the current state for a single resource,
 or `null` if the resource ID is not registered.
@@ -3440,7 +3892,7 @@ or `null` if the resource ID is not registered.
 
 > **getResourceStates**(): `object`[]
 
-Defined in: [offline/sync/SyncCoordinator.ts:160](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/SyncCoordinator.ts#L160)
+Defined in: [offline/sync/SyncCoordinator.ts:160](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/SyncCoordinator.ts#L160)
 
 Returns snapshots of the current state for all registered resources.
 
@@ -3452,7 +3904,7 @@ Returns snapshots of the current state for all registered resources.
 
 > **hydrateResourceStates**(`states`): `void`
 
-Defined in: [offline/sync/SyncCoordinator.ts:176](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/SyncCoordinator.ts#L176)
+Defined in: [offline/sync/SyncCoordinator.ts:176](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/SyncCoordinator.ts#L176)
 
 Replaces in-memory resource states with the supplied values, then emits a state-change
 notification. Used to restore persisted state after a page reload.
@@ -3471,7 +3923,7 @@ notification. Used to restore persisted state after a page reload.
 
 > **runTrigger**(`trigger`): `Promise`\<`void`\>
 
-Defined in: [offline/sync/SyncCoordinator.ts:196](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/SyncCoordinator.ts#L196)
+Defined in: [offline/sync/SyncCoordinator.ts:196](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/SyncCoordinator.ts#L196)
 
 Runs all resources that subscribe to `trigger`, in priority order.
 If a run for the same trigger is already in flight, returns the existing Promise
@@ -3493,7 +3945,7 @@ The event that initiated this sync pass.
 
 ### InvoiceOutboxEntry
 
-Defined in: [offline/invoiceOutbox.ts:13](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L13)
+Defined in: [offline/invoiceOutbox.ts:21](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L21)
 
 #### Properties
 
@@ -3501,91 +3953,91 @@ Defined in: [offline/invoiceOutbox.ts:13](https://github.com/ASL-AL-Uroba/POS-Aw
 
 > **acknowledged\_at**: `string` \| `null`
 
-Defined in: [offline/invoiceOutbox.ts:27](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L27)
+Defined in: [offline/invoiceOutbox.ts:35](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L35)
 
 ##### client\_request\_id
 
 > **client\_request\_id**: `string`
 
-Defined in: [offline/invoiceOutbox.ts:15](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L15)
+Defined in: [offline/invoiceOutbox.ts:23](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L23)
 
 ##### created\_at
 
 > **created\_at**: `string`
 
-Defined in: [offline/invoiceOutbox.ts:20](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L20)
+Defined in: [offline/invoiceOutbox.ts:28](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L28)
 
 ##### data
 
 > **data**: `AnyRecord`
 
-Defined in: [offline/invoiceOutbox.ts:19](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L19)
+Defined in: [offline/invoiceOutbox.ts:27](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L27)
 
 ##### invoice
 
 > **invoice**: `AnyRecord`
 
-Defined in: [offline/invoiceOutbox.ts:18](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L18)
+Defined in: [offline/invoiceOutbox.ts:26](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L26)
 
 ##### invoice\_name
 
 > **invoice\_name**: `string` \| `null`
 
-Defined in: [offline/invoiceOutbox.ts:26](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L26)
+Defined in: [offline/invoiceOutbox.ts:34](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L34)
 
 ##### last\_error
 
 > **last\_error**: `string` \| `null`
 
-Defined in: [offline/invoiceOutbox.ts:25](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L25)
+Defined in: [offline/invoiceOutbox.ts:33](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L33)
 
 ##### next\_retry\_at
 
 > **next\_retry\_at**: `string` \| `null`
 
-Defined in: [offline/invoiceOutbox.ts:22](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L22)
+Defined in: [offline/invoiceOutbox.ts:30](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L30)
 
 ##### nextAttemptAt?
 
 > `optional` **nextAttemptAt?**: `string` \| `null`
 
-Defined in: [offline/invoiceOutbox.ts:23](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L23)
+Defined in: [offline/invoiceOutbox.ts:31](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L31)
 
 ##### outbox\_id?
 
 > `optional` **outbox\_id?**: `number`
 
-Defined in: [offline/invoiceOutbox.ts:14](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L14)
+Defined in: [offline/invoiceOutbox.ts:22](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L22)
 
 ##### resource?
 
 > `optional` **resource?**: `"invoice_outbox"`
 
-Defined in: [offline/invoiceOutbox.ts:16](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L16)
+Defined in: [offline/invoiceOutbox.ts:24](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L24)
 
 ##### retry\_count
 
 > **retry\_count**: `number`
 
-Defined in: [offline/invoiceOutbox.ts:24](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L24)
+Defined in: [offline/invoiceOutbox.ts:32](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L32)
 
 ##### status
 
 > **status**: [`InvoiceOutboxStatus`](#invoiceoutboxstatus)
 
-Defined in: [offline/invoiceOutbox.ts:17](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L17)
+Defined in: [offline/invoiceOutbox.ts:25](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L25)
 
 ##### updated\_at
 
 > **updated\_at**: `string`
 
-Defined in: [offline/invoiceOutbox.ts:21](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L21)
+Defined in: [offline/invoiceOutbox.ts:29](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L29)
 
 ***
 
 ### OfflineQueueEntry
 
-Defined in: [offline/writeQueue.ts:22](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L22)
+Defined in: [offline/writeQueue.ts:22](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L22)
 
 #### Properties
 
@@ -3593,73 +4045,73 @@ Defined in: [offline/writeQueue.ts:22](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **created\_at**: `string`
 
-Defined in: [offline/writeQueue.ts:27](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L27)
+Defined in: [offline/writeQueue.ts:27](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L27)
 
 ##### entity\_type
 
 > **entity\_type**: [`OfflineEntityType`](#offlineentitytype)
 
-Defined in: [offline/writeQueue.ts:24](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L24)
+Defined in: [offline/writeQueue.ts:24](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L24)
 
 ##### idempotency\_key
 
 > **idempotency\_key**: `string`
 
-Defined in: [offline/writeQueue.ts:32](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L32)
+Defined in: [offline/writeQueue.ts:32](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L32)
 
 ##### last\_attempt\_at
 
 > **last\_attempt\_at**: `string` \| `null`
 
-Defined in: [offline/writeQueue.ts:28](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L28)
+Defined in: [offline/writeQueue.ts:28](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L28)
 
 ##### last\_error
 
 > **last\_error**: `string` \| `null`
 
-Defined in: [offline/writeQueue.ts:33](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L33)
+Defined in: [offline/writeQueue.ts:33](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L33)
 
 ##### next\_attempt\_at?
 
 > `optional` **next\_attempt\_at?**: `string` \| `null`
 
-Defined in: [offline/writeQueue.ts:29](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L29)
+Defined in: [offline/writeQueue.ts:29](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L29)
 
 ##### payload
 
 > **payload**: `AnyRecord`
 
-Defined in: [offline/writeQueue.ts:26](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L26)
+Defined in: [offline/writeQueue.ts:26](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L26)
 
 ##### queue\_id?
 
 > `optional` **queue\_id?**: `number`
 
-Defined in: [offline/writeQueue.ts:23](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L23)
+Defined in: [offline/writeQueue.ts:23](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L23)
 
 ##### resource?
 
 > `optional` **resource?**: [`OfflineEntityType`](#offlineentitytype)
 
-Defined in: [offline/writeQueue.ts:25](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L25)
+Defined in: [offline/writeQueue.ts:25](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L25)
 
 ##### retry\_count
 
 > **retry\_count**: `number`
 
-Defined in: [offline/writeQueue.ts:30](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L30)
+Defined in: [offline/writeQueue.ts:30](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L30)
 
 ##### status
 
 > **status**: [`OfflineQueueStatus`](#offlinequeuestatus)
 
-Defined in: [offline/writeQueue.ts:31](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L31)
+Defined in: [offline/writeQueue.ts:31](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L31)
 
 ***
 
 ### SyncResourceDefinition
 
-Defined in: [offline/sync/types.ts:72](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L72)
+Defined in: [offline/sync/types.ts:73](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L73)
 
 Static definition of a single sync resource. Registered in `resourceRegistry.ts`
 and consumed by `SyncCoordinator`.
@@ -3670,7 +4122,7 @@ and consumed by `SyncCoordinator`.
 
 > **fullResyncSupported**: `boolean`
 
-Defined in: [offline/sync/types.ts:88](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L88)
+Defined in: [offline/sync/types.ts:89](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L89)
 
 Whether the adapter supports full-resync (wiping and re-fetching all records).
 
@@ -3678,7 +4130,7 @@ Whether the adapter supports full-resync (wiping and re-fetching all records).
 
 > **id**: [`SyncResourceId`](#syncresourceid)
 
-Defined in: [offline/sync/types.ts:74](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L74)
+Defined in: [offline/sync/types.ts:75](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L75)
 
 Unique identifier.
 
@@ -3686,7 +4138,7 @@ Unique identifier.
 
 > **mode**: [`SyncResourceMode`](#syncresourcemode)
 
-Defined in: [offline/sync/types.ts:78](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L78)
+Defined in: [offline/sync/types.ts:79](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L79)
 
 Fetch strategy.
 
@@ -3694,7 +4146,7 @@ Fetch strategy.
 
 > **priority**: [`SyncResourcePriority`](#syncresourcepriority)
 
-Defined in: [offline/sync/types.ts:80](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L80)
+Defined in: [offline/sync/types.ts:81](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L81)
 
 Execution priority within a trigger run.
 
@@ -3702,7 +4154,7 @@ Execution priority within a trigger run.
 
 > **scope**: `"customer"` \| `"company"` \| `"global"` \| `"profile"`
 
-Defined in: [offline/sync/types.ts:76](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L76)
+Defined in: [offline/sync/types.ts:77](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L77)
 
 Data isolation boundary — determines the scope-signature used for cache invalidation.
 
@@ -3710,7 +4162,7 @@ Data isolation boundary — determines the scope-signature used for cache invali
 
 > **storageKey**: `string`
 
-Defined in: [offline/sync/types.ts:84](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L84)
+Defined in: [offline/sync/types.ts:85](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L85)
 
 IndexedDB/localStorage key prefix used by the adapter.
 
@@ -3718,7 +4170,7 @@ IndexedDB/localStorage key prefix used by the adapter.
 
 > **triggers**: [`SyncTrigger`](#synctrigger)[]
 
-Defined in: [offline/sync/types.ts:82](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L82)
+Defined in: [offline/sync/types.ts:83](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L83)
 
 Which triggers activate this resource.
 
@@ -3726,7 +4178,7 @@ Which triggers activate this resource.
 
 > `optional` **ttlMs?**: `number` \| `null`
 
-Defined in: [offline/sync/types.ts:90](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L90)
+Defined in: [offline/sync/types.ts:91](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L91)
 
 Optional TTL in milliseconds. `null` means no expiry.
 
@@ -3734,7 +4186,7 @@ Optional TTL in milliseconds. `null` means no expiry.
 
 > **watermarkType**: `"none"` \| `"timestamp"` \| `"cursor"`
 
-Defined in: [offline/sync/types.ts:86](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L86)
+Defined in: [offline/sync/types.ts:87](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L87)
 
 Watermark type used for delta syncs. `"none"` means full-resync every time.
 
@@ -3742,7 +4194,7 @@ Watermark type used for delta syncs. `"none"` means full-resync every time.
 
 ### SyncResourceState
 
-Defined in: [offline/sync/types.ts:103](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L103)
+Defined in: [offline/sync/types.ts:104](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L104)
 
 Runtime state of a single sync resource, persisted across page loads.
 Returned by `SyncCoordinator.getResourceState()` and
@@ -3759,85 +4211,85 @@ triggers full resyncs after data-model changes.
 
 > **consecutiveFailures**: `number`
 
-Defined in: [offline/sync/types.ts:110](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L110)
+Defined in: [offline/sync/types.ts:111](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L111)
 
 ##### cooldownMs?
 
 > `optional` **cooldownMs?**: `number` \| `null`
 
-Defined in: [offline/sync/types.ts:113](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L113)
+Defined in: [offline/sync/types.ts:114](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L114)
 
 ##### lastAttemptAt?
 
 > `optional` **lastAttemptAt?**: `string` \| `null`
 
-Defined in: [offline/sync/types.ts:111](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L111)
+Defined in: [offline/sync/types.ts:112](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L112)
 
 ##### lastError
 
 > **lastError**: `string` \| `null`
 
-Defined in: [offline/sync/types.ts:109](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L109)
+Defined in: [offline/sync/types.ts:110](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L110)
 
 ##### lastSuccessHash
 
 > **lastSuccessHash**: `string` \| `null`
 
-Defined in: [offline/sync/types.ts:108](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L108)
+Defined in: [offline/sync/types.ts:109](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L109)
 
 ##### lastSyncedAt
 
 > **lastSyncedAt**: `string` \| `null`
 
-Defined in: [offline/sync/types.ts:106](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L106)
+Defined in: [offline/sync/types.ts:107](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L107)
 
 ##### lastTrigger?
 
 > `optional` **lastTrigger?**: [`SyncTrigger`](#synctrigger) \| `null`
 
-Defined in: [offline/sync/types.ts:114](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L114)
+Defined in: [offline/sync/types.ts:115](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L115)
 
 ##### nextRetryAt?
 
 > `optional` **nextRetryAt?**: `string` \| `null`
 
-Defined in: [offline/sync/types.ts:112](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L112)
+Defined in: [offline/sync/types.ts:113](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L113)
 
 ##### resourceId
 
 > **resourceId**: [`SyncResourceId`](#syncresourceid)
 
-Defined in: [offline/sync/types.ts:104](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L104)
+Defined in: [offline/sync/types.ts:105](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L105)
 
 ##### schemaVersion
 
 > **schemaVersion**: `string` \| `null`
 
-Defined in: [offline/sync/types.ts:116](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L116)
+Defined in: [offline/sync/types.ts:117](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L117)
 
 ##### scopeSignature
 
 > **scopeSignature**: `string` \| `null`
 
-Defined in: [offline/sync/types.ts:115](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L115)
+Defined in: [offline/sync/types.ts:116](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L116)
 
 ##### status
 
 > **status**: [`SyncLifecycleState`](#synclifecyclestate)
 
-Defined in: [offline/sync/types.ts:105](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L105)
+Defined in: [offline/sync/types.ts:106](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L106)
 
 ##### watermark
 
 > **watermark**: `string` \| `null`
 
-Defined in: [offline/sync/types.ts:107](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L107)
+Defined in: [offline/sync/types.ts:108](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L108)
 
 ***
 
 ### SyncTriggerResourceSummary
 
-Defined in: [offline/sync/types.ts:119](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L119)
+Defined in: [offline/sync/types.ts:120](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L120)
 
 #### Properties
 
@@ -3845,37 +4297,37 @@ Defined in: [offline/sync/types.ts:119](https://github.com/ASL-AL-Uroba/POS-Awes
 
 > **error**: `string` \| `null`
 
-Defined in: [offline/sync/types.ts:124](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L124)
+Defined in: [offline/sync/types.ts:125](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L125)
 
 ##### priority
 
 > **priority**: [`SyncResourcePriority`](#syncresourcepriority)
 
-Defined in: [offline/sync/types.ts:121](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L121)
+Defined in: [offline/sync/types.ts:122](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L122)
 
 ##### resourceId
 
 > **resourceId**: [`SyncResourceId`](#syncresourceid)
 
-Defined in: [offline/sync/types.ts:120](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L120)
+Defined in: [offline/sync/types.ts:121](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L121)
 
 ##### skipped
 
 > **skipped**: `boolean`
 
-Defined in: [offline/sync/types.ts:123](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L123)
+Defined in: [offline/sync/types.ts:124](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L124)
 
 ##### status
 
 > **status**: [`SyncLifecycleState`](#synclifecyclestate)
 
-Defined in: [offline/sync/types.ts:122](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L122)
+Defined in: [offline/sync/types.ts:123](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L123)
 
 ***
 
 ### SyncTriggerRunSummary
 
-Defined in: [offline/sync/types.ts:127](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L127)
+Defined in: [offline/sync/types.ts:128](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L128)
 
 #### Properties
 
@@ -3883,13 +4335,13 @@ Defined in: [offline/sync/types.ts:127](https://github.com/ASL-AL-Uroba/POS-Awes
 
 > **bootCriticalFailures**: `number`
 
-Defined in: [offline/sync/types.ts:135](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L135)
+Defined in: [offline/sync/types.ts:136](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L136)
 
 ##### errors
 
 > **errors**: `object`[]
 
-Defined in: [offline/sync/types.ts:136](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L136)
+Defined in: [offline/sync/types.ts:137](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L137)
 
 ###### message
 
@@ -3907,49 +4359,49 @@ Defined in: [offline/sync/types.ts:136](https://github.com/ASL-AL-Uroba/POS-Awes
 
 > **failed**: `number`
 
-Defined in: [offline/sync/types.ts:133](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L133)
+Defined in: [offline/sync/types.ts:134](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L134)
 
 ##### finishedAt
 
 > **finishedAt**: `string`
 
-Defined in: [offline/sync/types.ts:130](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L130)
+Defined in: [offline/sync/types.ts:131](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L131)
 
 ##### resources
 
 > **resources**: [`SyncTriggerResourceSummary`](#synctriggerresourcesummary)[]
 
-Defined in: [offline/sync/types.ts:141](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L141)
+Defined in: [offline/sync/types.ts:142](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L142)
 
 ##### resourcesTotal
 
 > **resourcesTotal**: `number`
 
-Defined in: [offline/sync/types.ts:131](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L131)
+Defined in: [offline/sync/types.ts:132](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L132)
 
 ##### skipped
 
 > **skipped**: `number`
 
-Defined in: [offline/sync/types.ts:134](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L134)
+Defined in: [offline/sync/types.ts:135](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L135)
 
 ##### startedAt
 
 > **startedAt**: `string`
 
-Defined in: [offline/sync/types.ts:129](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L129)
+Defined in: [offline/sync/types.ts:130](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L130)
 
 ##### succeeded
 
 > **succeeded**: `number`
 
-Defined in: [offline/sync/types.ts:132](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L132)
+Defined in: [offline/sync/types.ts:133](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L133)
 
 ##### trigger
 
 > **trigger**: [`SyncTrigger`](#synctrigger)
 
-Defined in: [offline/sync/types.ts:128](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L128)
+Defined in: [offline/sync/types.ts:129](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L129)
 
 ## Type Aliases
 
@@ -3957,7 +4409,7 @@ Defined in: [offline/sync/types.ts:128](https://github.com/ASL-AL-Uroba/POS-Awes
 
 > **InvoiceOutboxMode** = `"off"` \| `"dual_write"` \| `"coordinator"`
 
-Defined in: [offline/invoiceOutbox.ts:5](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L5)
+Defined in: [offline/invoiceOutbox.ts:13](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L13)
 
 ***
 
@@ -3965,7 +4417,7 @@ Defined in: [offline/invoiceOutbox.ts:5](https://github.com/ASL-AL-Uroba/POS-Awe
 
 > **InvoiceOutboxStatus** = `"pending"` \| `"syncing"` \| `"retrying"` \| `"acknowledged"` \| `"dead_letter"`
 
-Defined in: [offline/invoiceOutbox.ts:6](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/invoiceOutbox.ts#L6)
+Defined in: [offline/invoiceOutbox.ts:14](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/invoiceOutbox.ts#L14)
 
 ***
 
@@ -3973,7 +4425,7 @@ Defined in: [offline/invoiceOutbox.ts:6](https://github.com/ASL-AL-Uroba/POS-Awe
 
 > **OfflineEntityType** = `"invoice"` \| `"customer"` \| `"payment"` \| `"cash_movement"`
 
-Defined in: [offline/writeQueue.ts:9](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L9)
+Defined in: [offline/writeQueue.ts:9](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L9)
 
 ***
 
@@ -3981,7 +4433,7 @@ Defined in: [offline/writeQueue.ts:9](https://github.com/ASL-AL-Uroba/POS-Awesom
 
 > **OfflinePruneResult** = `object`
 
-Defined in: [offline/db.ts:470](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L470)
+Defined in: [offline/db.ts:1213](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1213)
 
 #### Properties
 
@@ -3989,31 +4441,31 @@ Defined in: [offline/db.ts:470](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **invoiceOutbox**: `number`
 
-Defined in: [offline/db.ts:471](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L471)
+Defined in: [offline/db.ts:1214](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1214)
 
 ##### localTelemetry
 
 > **localTelemetry**: `number`
 
-Defined in: [offline/db.ts:475](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L475)
+Defined in: [offline/db.ts:1218](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1218)
 
 ##### syncState
 
 > **syncState**: `number`
 
-Defined in: [offline/db.ts:473](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L473)
+Defined in: [offline/db.ts:1216](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1216)
 
 ##### tombstones
 
 > **tombstones**: `number`
 
-Defined in: [offline/db.ts:474](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L474)
+Defined in: [offline/db.ts:1217](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1217)
 
 ##### writeQueue
 
 > **writeQueue**: `number`
 
-Defined in: [offline/db.ts:472](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L472)
+Defined in: [offline/db.ts:1215](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L1215)
 
 ***
 
@@ -4021,7 +4473,7 @@ Defined in: [offline/db.ts:472](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > **OfflineQueueStatus** = `"pending"` \| `"syncing"` \| `"failed"` \| `"dead_letter"` \| `"synced"`
 
-Defined in: [offline/writeQueue.ts:15](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/writeQueue.ts#L15)
+Defined in: [offline/writeQueue.ts:15](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/writeQueue.ts#L15)
 
 ***
 
@@ -4029,7 +4481,7 @@ Defined in: [offline/writeQueue.ts:15](https://github.com/ASL-AL-Uroba/POS-Aweso
 
 > **SyncLifecycleState** = `"idle"` \| `"syncing"` \| `"fresh"` \| `"stale"` \| `"error"` \| `"limited"`
 
-Defined in: [offline/sync/types.ts:60](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L60)
+Defined in: [offline/sync/types.ts:61](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L61)
 
 Per-resource lifecycle state exposed to the UI:
 - `"idle"` — not yet synced in this session.
@@ -4043,9 +4495,9 @@ Per-resource lifecycle state exposed to the UI:
 
 ### SyncResourceId
 
-> **SyncResourceId** = `"bootstrap_config"` \| `"price_list_meta"` \| `"currency_matrix"` \| `"payment_method_currencies"` \| `"item_groups"` \| `"offers"` \| `"items"` \| `"item_prices"` \| `"stock"` \| `"customers"` \| `"invoice_outbox"` \| `"customer_addresses"` \| `"delivery_charges"`
+> **SyncResourceId** = `"bootstrap_config"` \| `"price_list_meta"` \| `"currency_matrix"` \| `"payment_method_currencies"` \| `"item_groups"` \| `"offers"` \| `"items"` \| `"item_prices"` \| `"pricing_rules"` \| `"stock"` \| `"customers"` \| `"invoice_outbox"` \| `"customer_addresses"` \| `"delivery_charges"`
 
-Defined in: [offline/sync/types.ts:5](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L5)
+Defined in: [offline/sync/types.ts:5](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L5)
 
 All registered offline-sync resource identifiers.
 Each ID maps 1-to-1 with a [SyncResourceDefinition](#syncresourcedefinition) in the resource registry.
@@ -4056,7 +4508,7 @@ Each ID maps 1-to-1 with a [SyncResourceDefinition](#syncresourcedefinition) in 
 
 > **SyncResourceMode** = `"delta"` \| `"scoped"` \| `"on_demand"`
 
-Defined in: [offline/sync/types.ts:26](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L26)
+Defined in: [offline/sync/types.ts:27](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L27)
 
 How a resource is synchronised from the server:
 - `"delta"` — fetch only records changed since the last watermark.
@@ -4069,7 +4521,7 @@ How a resource is synchronised from the server:
 
 > **SyncResourcePriority** = `"boot_critical"` \| `"warm"` \| `"lazy"`
 
-Defined in: [offline/sync/types.ts:34](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L34)
+Defined in: [offline/sync/types.ts:35](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L35)
 
 Controls the order in which resources are processed within a single trigger run:
 - `"boot_critical"` — must succeed before the POS is usable offline.
@@ -4082,7 +4534,7 @@ Controls the order in which resources are processed within a single trigger run:
 
 > **SyncTrigger** = `"boot"` \| `"online_resume"` \| `"timer"` \| `"profile_change"` \| `"user_action"`
 
-Defined in: [offline/sync/types.ts:44](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/sync/types.ts#L44)
+Defined in: [offline/sync/types.ts:45](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/sync/types.ts#L45)
 
 Events that can kick off a sync run:
 - `"boot"` — app startup.
@@ -4097,7 +4549,7 @@ Events that can kick off a sync run:
 
 > `const` **db**: `any`
 
-Defined in: [offline/db.ts:43](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L43)
+Defined in: [offline/db.ts:51](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L51)
 
 ***
 
@@ -4105,7 +4557,7 @@ Defined in: [offline/db.ts:43](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/b
 
 > `const` **DERIVED\_OFFLINE\_CACHE\_KEYS**: readonly `string`[]
 
-Defined in: [offline/db.ts:132](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L132)
+Defined in: [offline/db.ts:199](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L199)
 
 ***
 
@@ -4113,7 +4565,7 @@ Defined in: [offline/db.ts:132](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > `const` **initPromise**: `Promise`\<`void`\>
 
-Defined in: [offline/db.ts:362](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L362)
+Defined in: [offline/db.ts:680](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L680)
 
 ***
 
@@ -4121,7 +4573,7 @@ Defined in: [offline/db.ts:362](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > `const` **KEY\_TABLE\_MAP**: `Record`\<`string`, `string`\>
 
-Defined in: [offline/db.ts:67](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L67)
+Defined in: [offline/db.ts:111](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L111)
 
 ***
 
@@ -4129,7 +4581,7 @@ Defined in: [offline/db.ts:67](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/b
 
 > `const` **memory**: `AnyRecord`
 
-Defined in: [offline/db.ts:294](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L294)
+Defined in: [offline/db.ts:397](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L397)
 
 ***
 
@@ -4137,7 +4589,7 @@ Defined in: [offline/db.ts:294](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > `const` **memoryInitPromise**: `Promise`\<`void`\> = `initPromise`
 
-Defined in: [offline/index.ts:46](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/index.ts#L46)
+Defined in: [offline/index.ts:49](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/index.ts#L49)
 
 ***
 
@@ -4145,7 +4597,23 @@ Defined in: [offline/index.ts:46](https://github.com/ASL-AL-Uroba/POS-Awesome-V1
 
 > `const` **PENDING\_OFFLINE\_QUEUE\_KEYS**: readonly `string`[]
 
-Defined in: [offline/db.ts:125](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/db.ts#L125)
+Defined in: [offline/db.ts:192](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L192)
+
+***
+
+### PERSIST\_WORKER\_READY\_TIMEOUT\_MS
+
+> `const` **PERSIST\_WORKER\_READY\_TIMEOUT\_MS**: `30000` = `30_000`
+
+Defined in: [offline/db.ts:517](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L517)
+
+***
+
+### PERSIST\_WORKER\_TIMEOUT\_MS
+
+> `const` **PERSIST\_WORKER\_TIMEOUT\_MS**: `10000` = `10_000`
+
+Defined in: [offline/db.ts:516](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L516)
 
 ***
 
@@ -4153,7 +4621,7 @@ Defined in: [offline/db.ts:125](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/
 
 > `const` **setTaxTemplate**: (`name`, `doc`) => `void` = `saveTaxTemplate`
 
-Defined in: [offline/cache.ts:838](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/b37d9e96bb3c937bccf2cccfe70629b670b2efa7/frontend/src/offline/cache.ts#L838)
+Defined in: [offline/cache.ts:1508](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/cache.ts#L1508)
 
 #### Parameters
 
@@ -4168,3 +4636,19 @@ Defined in: [offline/cache.ts:838](https://github.com/ASL-AL-Uroba/POS-Awesome-V
 #### Returns
 
 `void`
+
+***
+
+### STARTUP\_MEMORY\_KEYS
+
+> `const` **STARTUP\_MEMORY\_KEYS**: readonly `string`[]
+
+Defined in: [offline/db.ts:173](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L173)
+
+***
+
+### startupInitPromise
+
+> `const` **startupInitPromise**: `Promise`\<`void`\>
+
+Defined in: [offline/db.ts:666](https://github.com/ASL-AL-Uroba/POS-Awesome-V15/blob/fc720d161ecb3b929210e7a6c8f40800aa8b5c58/frontend/src/offline/db.ts#L666)

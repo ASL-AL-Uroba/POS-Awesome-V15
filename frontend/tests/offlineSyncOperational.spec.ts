@@ -10,6 +10,19 @@ const cacheMocks = vi.hoisted(() => ({
 	setBootstrapSnapshot: vi.fn(),
 	saveItemsBulk: vi.fn().mockResolvedValue(undefined),
 	clearStoredItems: vi.fn().mockResolvedValue(undefined),
+	beginItemCatalogGeneration: vi.fn().mockResolvedValue({
+		scope: "POS-1_Main WH",
+		generation: "generation-1",
+	}),
+	stageItemCatalogRows: vi.fn(async (items) => items.length),
+	promoteItemCatalogGeneration: vi.fn().mockResolvedValue({
+		generation: "generation-1",
+		rowCount: 1,
+		previousGeneration: "generation-0",
+	}),
+	discardItemCatalogGeneration: vi.fn().mockResolvedValue(undefined),
+	getActiveItemCatalogGeneration: vi.fn().mockResolvedValue("generation-0"),
+	withItemCatalogRefreshLock: vi.fn(async (_scope, task) => await task()),
 	deleteStoredItemsByCodes: vi.fn().mockResolvedValue(undefined),
 	getStoredItemsCountByScope: vi.fn().mockResolvedValue(7),
 	saveItemDetailsCache: vi.fn(),
@@ -52,12 +65,16 @@ const bootstrapSnapshotMocks = vi.hoisted(() => ({
 			prerequisites: {
 				...(currentSnapshot?.prerequisites || {}),
 				items_cache_ready:
-					typeof cacheState?.itemsCount === "number" ? "ready" : "missing",
+					typeof cacheState?.itemsCount === "number"
+						? "ready"
+						: "missing",
 				customers_cache_ready:
 					typeof cacheState?.customersCount === "number"
 						? "ready"
 						: "missing",
-				stock_cache_ready: cacheState?.stockCacheReady ? "ready" : "missing",
+				stock_cache_ready: cacheState?.stockCacheReady
+					? "ready"
+					: "missing",
 			},
 		}),
 	),
@@ -89,30 +106,35 @@ describe("operational offline sync adapters", () => {
 		});
 		syncStateMocks.getSyncResourceState.mockResolvedValue(null);
 		cacheMocks.getStoredItemsCountByScope.mockResolvedValue(7);
+		cacheMocks.getActiveItemCatalogGeneration.mockResolvedValue(
+			"generation-0",
+		);
 		cacheMocks.getCustomerStorageCount.mockResolvedValue(5);
 	});
 
-	it("clears stale item scope before applying delta writes and deletes", async () => {
-		syncStateMocks.getSyncResourceState.mockImplementation(async (resourceId) => {
-			if (resourceId === "items") {
-				return {
-					resourceId,
-					status: "fresh",
-					lastSyncedAt: "2026-04-09T09:00:00",
-					watermark: "2026-04-09T09:00:00",
-					lastSuccessHash: null,
-					lastError: null,
-					consecutiveFailures: 0,
-					scopeSignature: JSON.stringify({
-						profile: "OLD-POS",
-						company: "Test Co",
-						warehouse: "OLD-WH",
-					}),
-					schemaVersion: "2026-04-09",
-				};
-			}
-			return null;
-		});
+	it("stages a changed item scope before atomically replacing the active catalog", async () => {
+		syncStateMocks.getSyncResourceState.mockImplementation(
+			async (resourceId) => {
+				if (resourceId === "items") {
+					return {
+						resourceId,
+						status: "fresh",
+						lastSyncedAt: "2026-04-09T09:00:00",
+						watermark: "2026-04-09T09:00:00",
+						lastSuccessHash: null,
+						lastError: null,
+						consecutiveFailures: 0,
+						scopeSignature: JSON.stringify({
+							profile: "OLD-POS",
+							company: "Test Co",
+							warehouse: "OLD-WH",
+						}),
+						schemaVersion: "2026-04-09",
+					};
+				}
+				return null;
+			},
+		);
 
 		const fetcher = vi.fn(async ({ watermark }) => {
 			expect(watermark).toBeNull();
@@ -149,47 +171,24 @@ describe("operational offline sync adapters", () => {
 			fetcher,
 		});
 
-		expect(cacheMocks.clearStoredItems).toHaveBeenCalledWith();
+		expect(cacheMocks.clearStoredItems).not.toHaveBeenCalled();
 		expect(cacheMocks.clearPriceListCache).toHaveBeenCalledOnce();
 		expect(cacheMocks.clearItemDetailsCache).toHaveBeenCalledOnce();
-		expect(cacheMocks.saveItemsBulk).toHaveBeenCalledWith(
+		expect(cacheMocks.stageItemCatalogRows).toHaveBeenCalledWith(
 			[
 				expect.objectContaining({
 					item_code: "ITEM-001",
 				}),
 			],
 			"POS-1_Main WH",
+			"generation-1",
 		);
-		expect(cacheMocks.saveItemDetailsCache).toHaveBeenCalledWith(
-			"POS-1",
-			"Retail",
-			[
-				expect.objectContaining({
-					item_code: "ITEM-001",
-				}),
-			],
-		);
-		expect(cacheMocks.mergeCachedPriceListItems).toHaveBeenCalledWith(
-			"Retail",
-			[
-				expect.objectContaining({
-					item_code: "ITEM-001",
-				}),
-			],
-		);
-		expect(cacheMocks.deleteStoredItemsByCodes).toHaveBeenCalledWith(
-			["ITEM-002"],
+		expect(cacheMocks.promoteItemCatalogGeneration).toHaveBeenCalledWith(
 			"POS-1_Main WH",
+			"generation-1",
+			{ expectedCount: 1, allowEmpty: true },
 		);
-		expect(cacheMocks.removeItemDetailsCacheEntries).toHaveBeenCalledWith(
-			"POS-1",
-			["ITEM-002"],
-			"Retail",
-		);
-		expect(cacheMocks.removeCachedPriceListItems).toHaveBeenCalledWith(
-			["ITEM-002"],
-			"Retail",
-		);
+		expect(cacheMocks.deleteStoredItemsByCodes).not.toHaveBeenCalled();
 		expect(cacheMocks.getStoredItemsCountByScope).toHaveBeenCalledWith(
 			"POS-1_Main WH",
 		);
@@ -207,13 +206,260 @@ describe("operational offline sync adapters", () => {
 				}),
 			}),
 		);
-		expect(syncStateMocks.setSyncResourceState).toHaveBeenCalledWith(
+		expect(syncStateMocks.setSyncResourceState).not.toHaveBeenCalledWith(
 			expect.objectContaining({
 				resourceId: "item_prices",
-				status: "fresh",
 			}),
 		);
 		expect(result.status).toBe("fresh");
+	});
+
+	it("streams every initial item page by item-code cursor before marking the snapshot fresh", async () => {
+		const fetcher = vi.fn(async ({ watermark, startAfter, limit }) => {
+			expect(watermark).toBeNull();
+			expect(limit).toBe(1000);
+			if (!startAfter) {
+				return {
+					schema_version: "2026-05-20",
+					next_watermark: "2026-05-20T10:00:00",
+					has_more: true,
+					changes: [
+						{
+							key: "item::ITEM-001",
+							modified: "2026-05-20T10:00:00",
+							data: {
+								item_code: "ITEM-001",
+								item_name: "Alpha",
+								price_list_rate: 10,
+							},
+						},
+					],
+					deleted: [],
+				};
+			}
+			expect(startAfter).toBe("ITEM-001");
+			return {
+				schema_version: "2026-05-20",
+				next_watermark: "2026-05-20T10:05:00",
+				has_more: false,
+				changes: [
+					{
+						key: "item::ITEM-002",
+						modified: "2026-05-20T10:05:00",
+						data: {
+							item_code: "ITEM-002",
+							item_name: "Beta",
+							price_list_rate: 20,
+						},
+					},
+				],
+				deleted: [],
+			};
+		});
+
+		const result = await syncItemsResource({
+			posProfile: {
+				name: "POS-1",
+				company: "Test Co",
+				warehouse: "Main WH",
+				modified: "2026-05-20T11:00:00",
+			},
+			priceList: "Retail",
+			watermark: null,
+			fetcher,
+		});
+
+		expect(fetcher).toHaveBeenCalledTimes(2);
+		expect(cacheMocks.stageItemCatalogRows).toHaveBeenNthCalledWith(
+			1,
+			[expect.objectContaining({ item_code: "ITEM-001" })],
+			"POS-1_Main WH",
+			"generation-1",
+		);
+		expect(cacheMocks.stageItemCatalogRows).toHaveBeenNthCalledWith(
+			2,
+			[expect.objectContaining({ item_code: "ITEM-002" })],
+			"POS-1_Main WH",
+			"generation-1",
+		);
+		expect(cacheMocks.promoteItemCatalogGeneration).toHaveBeenCalledWith(
+			"POS-1_Main WH",
+			"generation-1",
+			{ expectedCount: 2, allowEmpty: true },
+		);
+		expect(cacheMocks.setItemsLastSync).toHaveBeenCalledWith(
+			"2026-05-20T10:05:00",
+		);
+		expect(result.status).toBe("fresh");
+	});
+
+	it("forces a complete generation when a legacy watermark exists without an active catalog", async () => {
+		cacheMocks.getActiveItemCatalogGeneration.mockResolvedValue(null);
+		const fetcher = vi.fn(async ({ watermark }) => {
+			expect(watermark).toBeNull();
+			return {
+				schema_version: "2026-07-12",
+				next_watermark: "2026-07-12T12:00:00",
+				has_more: false,
+				changes: [
+					{
+						key: "item::ITEM-FULL",
+						data: {
+							item_code: "ITEM-FULL",
+							item_name: "Full Catalog Item",
+						},
+					},
+				],
+				deleted: [],
+			};
+		});
+
+		await syncItemsResource({
+			posProfile: {
+				name: "POS-1",
+				company: "Test Co",
+				warehouse: "Main WH",
+			},
+			watermark: "2026-07-11T12:00:00",
+			fetcher,
+		});
+
+		expect(cacheMocks.stageItemCatalogRows).toHaveBeenCalledWith(
+			[expect.objectContaining({ item_code: "ITEM-FULL" })],
+			"POS-1_Main WH",
+			"generation-1",
+		);
+		expect(cacheMocks.promoteItemCatalogGeneration).toHaveBeenCalledOnce();
+	});
+
+	it("keeps the active generation when a full item sync fails mid-refresh", async () => {
+		const fetchError = new Error("catalog request failed");
+		const fetcher = vi.fn().mockRejectedValue(fetchError);
+
+		await expect(
+			syncItemsResource({
+				posProfile: {
+					name: "POS-1",
+					company: "Test Co",
+					warehouse: "Main WH",
+				},
+				watermark: null,
+				fetcher,
+			}),
+		).rejects.toBe(fetchError);
+
+		expect(cacheMocks.promoteItemCatalogGeneration).not.toHaveBeenCalled();
+		expect(cacheMocks.discardItemCatalogGeneration).toHaveBeenCalledWith(
+			"POS-1_Main WH",
+			"generation-1",
+		);
+		expect(cacheMocks.clearPriceListCache).not.toHaveBeenCalled();
+		expect(cacheMocks.clearItemDetailsCache).not.toHaveBeenCalled();
+	});
+
+	it("rebuilds the full item cache when the server requests a schema resync", async () => {
+		const fetcher = vi.fn(async ({ watermark, schemaVersion }) => {
+			if (fetcher.mock.calls.length === 1) {
+				expect(watermark).toBe("2026-04-09T10:00:00");
+				expect(schemaVersion).toBe("2026-04-09");
+				return {
+					schema_version: "2026-05-20",
+					full_resync_required: true,
+					has_more: false,
+					changes: [],
+					deleted: [],
+				};
+			}
+			expect(watermark).toBeNull();
+			expect(schemaVersion).toBeNull();
+			return {
+				schema_version: "2026-05-20",
+				next_watermark: "2026-05-20T11:00:00",
+				has_more: false,
+				changes: [
+					{
+						key: "item::ITEM-NEW",
+						modified: "2026-05-20T11:00:00",
+						data: {
+							item_code: "ITEM-NEW",
+							item_name: "New Item",
+							price_list_rate: 30,
+						},
+					},
+				],
+				deleted: [],
+			};
+		});
+
+		const result = await syncItemsResource({
+			posProfile: {
+				name: "POS-1",
+				company: "Test Co",
+				warehouse: "Main WH",
+				modified: "2026-05-20T11:00:00",
+			},
+			priceList: "Retail",
+			watermark: "2026-04-09T10:00:00",
+			schemaVersion: "2026-04-09",
+			fetcher,
+		});
+
+		expect(fetcher).toHaveBeenCalledTimes(2);
+		expect(cacheMocks.clearStoredItems).not.toHaveBeenCalled();
+		expect(cacheMocks.clearPriceListCache).toHaveBeenCalledOnce();
+		expect(cacheMocks.clearItemDetailsCache).toHaveBeenCalledOnce();
+		expect(cacheMocks.stageItemCatalogRows).toHaveBeenCalledWith(
+			[expect.objectContaining({ item_code: "ITEM-NEW" })],
+			"POS-1_Main WH",
+			"generation-1",
+		);
+		expect(result.status).toBe("fresh");
+	});
+
+	it("keeps the prior delta watermark when the server reports more changes", async () => {
+		const fetcher = vi.fn(async () => ({
+			schema_version: "2026-05-20",
+			next_watermark: "2026-05-20T11:00:00",
+			has_more: true,
+			changes: [
+				{
+					key: "item::ITEM-CHANGED",
+					modified: "2026-05-20T11:00:00",
+					data: {
+						item_code: "ITEM-CHANGED",
+						item_name: "Changed Item",
+						price_list_rate: 40,
+					},
+				},
+			],
+			deleted: [],
+		}));
+
+		const result = await syncItemsResource({
+			posProfile: {
+				name: "POS-1",
+				company: "Test Co",
+				warehouse: "Main WH",
+				modified: "2026-05-20T11:00:00",
+			},
+			priceList: "Retail",
+			watermark: "2026-05-20T10:00:00",
+			fetcher,
+		});
+
+		expect(fetcher).toHaveBeenCalledOnce();
+		expect(cacheMocks.setItemsLastSync).toHaveBeenCalledWith(
+			"2026-05-20T10:00:00",
+		);
+		expect(syncStateMocks.setSyncResourceState).toHaveBeenCalledWith(
+			expect.objectContaining({
+				resourceId: "items",
+				status: "limited",
+				watermark: "2026-05-20T10:00:00",
+			}),
+		);
+		expect(result.status).toBe("limited");
+		expect(result.watermark).toBe("2026-05-20T10:00:00");
 	});
 
 	it("clears stale customer scope before applying delta writes and deletes", async () => {
@@ -269,9 +515,9 @@ describe("operational offline sync adapters", () => {
 				customer_name: "Customer One",
 			},
 		]);
-		expect(customerMocks.deleteCustomerStorageByNames).toHaveBeenCalledWith([
-			"CUST-002",
-		]);
+		expect(customerMocks.deleteCustomerStorageByNames).toHaveBeenCalledWith(
+			["CUST-002"],
+		);
 		expect(cacheMocks.getCustomerStorageCount).toHaveBeenCalledOnce();
 		expect(cacheMocks.setCustomersLastSync).toHaveBeenCalledWith(
 			"2026-04-09T11:00:00",
@@ -303,7 +549,10 @@ describe("operational offline sync adapters", () => {
 						{
 							key: "customer::CUST-001",
 							modified: "2026-05-20T10:00:00",
-							data: { name: "CUST-001", customer_name: "Customer One" },
+							data: {
+								name: "CUST-001",
+								customer_name: "Customer One",
+							},
 						},
 					],
 					deleted: [],
@@ -318,7 +567,10 @@ describe("operational offline sync adapters", () => {
 					{
 						key: "customer::CUST-002",
 						modified: "2026-05-20T10:05:00",
-						data: { name: "CUST-002", customer_name: "Customer Two" },
+						data: {
+							name: "CUST-002",
+							customer_name: "Customer Two",
+						},
 					},
 				],
 				deleted: [],
@@ -336,8 +588,10 @@ describe("operational offline sync adapters", () => {
 		});
 
 		expect(fetcher).toHaveBeenCalledTimes(2);
-		expect(customerMocks.setCustomerStorage).toHaveBeenCalledWith([
+		expect(customerMocks.setCustomerStorage).toHaveBeenNthCalledWith(1, [
 			expect.objectContaining({ name: "CUST-001" }),
+		]);
+		expect(customerMocks.setCustomerStorage).toHaveBeenNthCalledWith(2, [
 			expect.objectContaining({ name: "CUST-002" }),
 		]);
 		expect(cacheMocks.setCustomersLastSync).toHaveBeenCalledWith(

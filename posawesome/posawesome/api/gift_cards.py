@@ -5,12 +5,11 @@ from frappe.utils import nowdate
 
 from posawesome.posawesome.api.utilities import ensure_child_doctype
 
-from posawesome.posawesome.api.employees import (
-    _ensure_terminal_user,
-    _get_user_doc,
-    _is_pos_supervisor,
-    _resolve_profile_name,
+from posawesome.posawesome.api.pos_access import (
+    get_authorized_pos_profile,
+    user_can_manage_pos,
 )
+from posawesome.posawesome.api.terminal_state import get_active_terminal_cashier
 
 
 def _to_float(value) -> float:
@@ -47,27 +46,27 @@ def _doc_value(doc, key, default=None):
 
 
 def _require_supervisor(pos_profile=None, cashier=None):
-    profile_name = _resolve_profile_name(pos_profile)
-    if not profile_name:
-        frappe.throw(frappe._("POS profile is required."))
-
-    cashier = str(cashier or "").strip()
-    if not cashier:
-        frappe.throw(frappe._("Cashier is required."))
-
-    _ensure_terminal_user(profile_name, cashier)
-    user_doc = _get_user_doc(cashier)
-    if not _is_pos_supervisor(user_doc):
+    profile_doc = get_authorized_pos_profile(pos_profile)
+    profile_name = str(_doc_value(profile_doc, "name") or "").strip()
+    authoritative_cashier = get_active_terminal_cashier(profile_name)
+    if not user_can_manage_pos(authoritative_cashier):
         frappe.throw(frappe._("A POS supervisor is required for this action."))
 
-    return profile_name, cashier, user_doc
+    return profile_name, authoritative_cashier, frappe.get_doc("User", authoritative_cashier)
 
 
 def _get_profile_doc(pos_profile=None):
-    profile_name = _resolve_profile_name(pos_profile)
-    if not profile_name:
-        frappe.throw(frappe._("POS profile is required."))
-    return frappe.get_cached_doc("POS Profile", profile_name)
+    return get_authorized_pos_profile(pos_profile)
+
+
+def _canonical_profile_company(profile_doc, requested_company=None):
+    company = str(_doc_value(profile_doc, "company") or "").strip()
+    if not company:
+        frappe.throw(frappe._("The authorized POS Profile must have a company."))
+    requested_company = str(requested_company or "").strip()
+    if requested_company and requested_company != company:
+        frappe.throw(frappe._("Company does not match the authorized POS Profile."))
+    return company
 
 
 def _resolve_cost_center(profile_doc, company):
@@ -101,15 +100,56 @@ def _resolve_liability_account(profile_doc):
     return liability_account
 
 
+def _enrich_je_accounts_with_currency(company, accounts, posting_date):
+    """Annotate JE rows with account_currency + exchange_rate.
+
+    Without this the gift-card Journal Entry only carried *_in_account_currency
+    amounts, so for a foreign-currency liability/receivable account ERPNext
+    derived the base amount from the system exchange rate at submit time, which
+    could drift from the invoice's recorded conversion_rate and leave the GL
+    unbalanced in base currency. Callers may pass an explicit exchange_rate on a
+    row (e.g. the invoice conversion_rate for the receivable); otherwise we use
+    1 for company-currency accounts and ERPNext's get_exchange_rate elsewhere.
+    Returns 1 when any row is in a non-company currency.
+    """
+    from erpnext.setup.utils import get_exchange_rate
+
+    company_currency = frappe.get_cached_value("Company", company, "default_currency")
+    multi_currency = 0
+    for row in accounts:
+        account = row.get("account")
+        if not account:
+            continue
+        account_currency = (
+            frappe.get_cached_value("Account", account, "account_currency") or company_currency
+        )
+        row["account_currency"] = account_currency
+        if account_currency == company_currency:
+            row["exchange_rate"] = 1
+            continue
+        multi_currency = 1
+        if not row.get("exchange_rate"):
+            try:
+                row["exchange_rate"] = frappe.utils.flt(
+                    get_exchange_rate(account_currency, company_currency, posting_date)
+                ) or 1
+            except Exception:
+                row["exchange_rate"] = 1
+    return multi_currency
+
+
 def _create_gift_card_journal_entry(company, posting_date, remark, accounts):
+    posting_date = posting_date or nowdate()
     je_doc = frappe.get_doc(
         {
             "doctype": "Journal Entry",
             "voucher_type": "Journal Entry",
-            "posting_date": posting_date or nowdate(),
+            "posting_date": posting_date,
             "company": company,
         }
     )
+
+    je_doc.multi_currency = 1 if _enrich_je_accounts_with_currency(company, accounts, posting_date) else 0
 
     for row in accounts:
         account_row = je_doc.append("accounts", {})
@@ -425,6 +465,9 @@ def _create_redemption_entry(profile_doc, invoice_doc, amount, cashier):
                 "reference_type": invoice_doc.doctype,
                 "reference_name": invoice_doc.name,
                 "credit_in_account_currency": redeem_amount,
+                # Use the invoice's recorded rate for the receivable so the base
+                # amount matches the invoice instead of a drifting system rate.
+                "exchange_rate": frappe.utils.flt(_doc_value(invoice_doc, "conversion_rate")) or 1,
                 "cost_center": cost_center,
                 "user_remark": cashier,
             },
@@ -440,16 +483,15 @@ def issue_gift_card(
     initial_amount=0,
     gift_card_code=None,
     expiry_date=None,
-    currency="PKR",
+    currency=None,
 ):
     profile_name, cashier, _user_doc = _require_supervisor(pos_profile, cashier)
     profile_doc = _get_profile_doc(profile_name)
+    company = _canonical_profile_company(profile_doc, company)
 
     amount = _to_float(initial_amount)
     if amount < 0:
         frappe.throw(frappe._("Initial amount cannot be negative."))
-    if not company:
-        frappe.throw(frappe._("Company is required."))
 
     code = _normalize_code(gift_card_code)
     if frappe.db.exists("POS Gift Card", {"gift_card_code": code}):
@@ -458,7 +500,13 @@ def issue_gift_card(
     gift_card_doc = frappe.new_doc("POS Gift Card")
     gift_card_doc.gift_card_code = code
     gift_card_doc.company = company
-    gift_card_doc.currency = currency or "PKR"
+    # Resolve currency from the caller, then the POS Profile, then the
+    # company default — never a hardcoded "PKR".
+    gift_card_doc.currency = (
+        currency
+        or _doc_value(profile_doc, "currency")
+        or frappe.get_cached_value("Company", company, "default_currency")
+    )
     gift_card_doc.current_balance = amount
     gift_card_doc.status = "Active"
     gift_card_doc.expiry_date = expiry_date
@@ -489,18 +537,21 @@ def issue_gift_card(
 def top_up_gift_card(pos_profile=None, cashier=None, gift_card_code=None, amount=0):
     profile_name, cashier, _user_doc = _require_supervisor(pos_profile, cashier)
     profile_doc = _get_profile_doc(profile_name)
+    company = _canonical_profile_company(profile_doc)
 
     top_up_amount = _to_float(amount)
     if top_up_amount <= 0:
         frappe.throw(frappe._("Top up amount must be greater than zero."))
 
     gift_card_doc = _get_gift_card(gift_card_code)
+    if str(_doc_value(gift_card_doc, "company") or "").strip() != company:
+        frappe.throw(frappe._("Gift card does not belong to company {0}.").format(company))
     if getattr(gift_card_doc, "status", "Active") != "Active":
         frappe.throw(frappe._("Only active gift cards can be topped up."))
 
     _create_issue_or_top_up_entry(
         profile_doc,
-        _doc_value(gift_card_doc, "company"),
+        company,
         top_up_amount,
         "POS Gift Card",
         _doc_value(gift_card_doc, "name"),

@@ -20,6 +20,12 @@ export interface PurchaseItem {
 	standard_rate: number;
 	received_qty: number;
 	receivedQtyManual: boolean;
+	warehouse?: string;
+	ordered_qty?: number;
+	pending_receipt_qty?: number;
+	billed_qty?: number;
+	pending_bill_qty?: number;
+	source_docstatus?: number;
 	_isEditingQty?: boolean;
 	_editingQtyValue?: string;
 	_isEditingRate?: boolean;
@@ -36,6 +42,7 @@ export function usePurchaseOrder(options: {
 	const itemsStore = useItemsStore();
 
 	const purchaseItems = ref<PurchaseItem[]>([]);
+	const purchaseOrderName = ref<string | null>(null);
 	const supplier = ref<string | null>(null);
 	const warehouse = ref<string | null>(null);
 	const transactionDate = ref<string | null>(null);
@@ -230,6 +237,7 @@ export function usePurchaseOrder(options: {
 	};
 
 	const resetForm = () => {
+		purchaseOrderName.value = null;
 		supplier.value = null;
 		supplierPriceList.value = null;
 		priceListCurrency.value = null;
@@ -249,6 +257,7 @@ export function usePurchaseOrder(options: {
 
 	return {
 		purchaseItems,
+		purchaseOrderName,
 		supplier,
 		warehouse,
 		transactionDate,

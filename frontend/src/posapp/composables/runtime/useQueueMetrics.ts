@@ -109,12 +109,18 @@ export function useQueueMetrics(options: UseQueueMetricsOptions) {
 
 	async function checkCacheCapacity(
 		thresholdPercentage = 90,
-		onNearCapacity?: () => void,
+		onNearCapacity?: (usage: CacheUsage) => void,
 	) {
 		try {
 			const usage = await options.getCacheUsageEstimate();
+			cacheUsage.value = usage.percentage || 0;
+			cacheUsageDetails.value = {
+				total: usage.total || 0,
+				indexedDB: usage.indexedDB || 0,
+				localStorage: usage.localStorage || 0,
+			};
 			if ((usage.percentage || 0) > thresholdPercentage) {
-				onNearCapacity?.();
+				onNearCapacity?.(usage);
 			}
 		} catch {
 			// Cache estimates are best-effort status signals.

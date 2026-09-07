@@ -8,6 +8,7 @@ import { computed, defineComponent, h, ref } from "vue";
 const itemAvailabilitySpies = vi.hoisted(() => ({
 	initAvailability: vi.fn(),
 	registerCallbacks: vi.fn(),
+	primeStockState: vi.fn(),
 	handleCartQuantitiesUpdated: vi.fn(),
 	handleInvoiceStockAdjusted: vi.fn(),
 }));
@@ -17,6 +18,20 @@ const lastBuyingRateSpies = vi.hoisted(() => ({
 	getLastBuyingRate: vi.fn(() => null),
 	scheduleLastBuyingRateRefresh: vi.fn(),
 	clearLastBuyingRateCache: vi.fn(),
+}));
+
+const itemAdditionSpies = vi.hoisted(() => ({
+	handleVariantItem: vi.fn(),
+	prepareItemForCart: vi.fn(async () => {}),
+	addItem: vi.fn(async (item: any) => item),
+}));
+
+const batchSerialSpies = vi.hoisted(() => ({
+	setBatchQty: vi.fn(),
+}));
+
+const itemSelectionSpies = vi.hoisted(() => ({
+	registerContext: vi.fn(),
 }));
 
 vi.mock("../src/offline/index", () => ({
@@ -147,15 +162,20 @@ vi.mock("../src/posapp/composables/pos/items/useItemDetailFetcher", () => ({
 
 vi.mock("../src/posapp/composables/pos/items/useItemAddition", () => ({
 	useItemAddition: () => ({
-		handleVariantItem: vi.fn(),
-		prepareItemForCart: vi.fn(async () => {}),
-		addItem: vi.fn(async () => {}),
+		...itemAdditionSpies,
+	}),
+}));
+
+vi.mock("../src/posapp/composables/pos/shared/useBatchSerial", () => ({
+	useBatchSerial: () => ({
+		...batchSerialSpies,
 	}),
 }));
 
 vi.mock("../src/posapp/composables/pos/items/useItemSelection", () => ({
 	useItemSelection: () => ({
-		registerContext: vi.fn(),
+		highlightedItemCode: ref(null),
+		...itemSelectionSpies,
 		clearHighlightedItem: vi.fn(),
 		syncHighlightedItem: vi.fn(),
 		selectTopItem: vi.fn(),
@@ -303,6 +323,7 @@ vi.mock("../src/posapp/composables/pos/items/useBarcodeIndexing", () => ({
 		indexItem: vi.fn(),
 		replaceBarcodeIndex: vi.fn(),
 		lookupItemByBarcode: vi.fn(() => null),
+		resolveItemByBarcode: vi.fn(() => null),
 		searchItemsByCode: vi.fn(() => []),
 	}),
 }));
@@ -564,5 +585,49 @@ describe("ItemsSelector stock wiring", () => {
 			"purchase",
 			"cost",
 		]);
+	});
+
+	it("passes the shared batch setter into item additions", async () => {
+		const { useUIStore } = await import("../src/posapp/stores/uiStore");
+		const uiStore = useUIStore();
+		uiStore.setPosProfile({
+			name: "POS-1",
+			currency: "PKR",
+			selling_price_list: "Standard Selling",
+			posa_auto_set_batch: 1,
+			posa_decimal_precision: 3,
+		} as any);
+
+		const ItemsSelector = (await import(
+			"../src/posapp/components/pos/items/ItemsSelector.vue"
+		)).default;
+		const wrapper = shallowMount(ItemsSelector, {
+			global: {
+				provide: {
+					eventBus: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
+				},
+			},
+		});
+
+		const item = {
+			item_code: "BATCHED-ITEM",
+			has_batch_no: 1,
+			qty: 1,
+		};
+		await wrapper.vm.$nextTick();
+		const selectorContext = itemSelectionSpies.registerContext.mock.calls.at(-1)?.[0];
+		await selectorContext.addItem(item, { qty: 1 });
+
+		const context = itemAdditionSpies.prepareItemForCart.mock.calls.at(-1)?.[2];
+		expect(context?.flt).toEqual(expect.any(Function));
+		expect(context?.currency_precision).toBe(3);
+		expect(context?.setBatchQty).toEqual(expect.any(Function));
+		context.setBatchQty(item, "BATCH-1", false);
+		expect(batchSerialSpies.setBatchQty).toHaveBeenCalledWith(
+			item,
+			"BATCH-1",
+			false,
+			context,
+		);
 	});
 });

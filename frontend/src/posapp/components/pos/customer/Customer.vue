@@ -11,7 +11,7 @@
 				color="primary"
 				:label="customerFieldLabel"
 				:placeholder="customerFieldPlaceholder"
-				:loading="isCustomerSearchLocked"
+				:loading="isCustomerSearchLocked || isCustomerLookupPending"
 				v-model="internalCustomer"
 				:items="filteredCustomers"
 				item-title="customer_name"
@@ -35,8 +35,12 @@
 							<v-icon
 								v-bind="props"
 								class="icon-button"
+								role="button"
+								tabindex="0"
+								:aria-label="__('Edit customer')"
 								@mousedown.prevent.stop
 								@click.stop="edit_customer"
+								@keyup.enter.space.prevent.stop="edit_customer"
 							>
 								mdi-account-edit
 							</v-icon>
@@ -48,8 +52,13 @@
 								v-bind="props"
 								class="icon-button ml-1"
 								:class="{ 'disabled-icon': !networkOnline }"
+								role="button"
+								:tabindex="networkOnline ? 0 : -1"
+								:aria-label="__('Reload customers')"
+								:aria-disabled="!networkOnline"
 								@mousedown.prevent.stop
 								@click.stop="reload_customers"
+								@keyup.enter.space.prevent.stop="reload_customers"
 							>
 								mdi-reload
 							</v-icon>
@@ -59,16 +68,19 @@
 
 				<!-- Add icon (right) -->
 				<template #append-inner>
-					<span v-if="showCustomerLoadProgress" class="customer-load-percent">
-						{{ customerLoadPercent }}%
-					</span>
 					<v-tooltip :text="__('Add new customer')" content-class="posa-theme-tooltip">
 						<template #activator="{ props }">
 							<v-icon
 								v-bind="props"
 								class="icon-button"
+								:class="{ 'disabled-icon': isCustomerLookupPending }"
+								role="button"
+								:tabindex="isCustomerLookupPending ? -1 : 0"
+								:aria-label="__('Add new customer')"
+								:aria-disabled="isCustomerLookupPending"
 								@mousedown.prevent.stop
 								@click.stop="new_customer"
+								@keyup.enter.space.prevent.stop="new_customer"
 							>
 								mdi-plus
 							</v-icon>
@@ -105,6 +117,12 @@
 				class="customer-load-bar"
 				rounded
 			/>
+			<div v-if="showCustomerLoadProgress" class="customer-load-status" aria-live="polite">
+				<span class="customer-load-status__count">
+					{{ customerLoadedCountLabel }}
+				</span>
+				<span class="customer-load-status__percent"> {{ customerLoadPercent }}% </span>
+			</div>
 		</div>
 		<!-- Update customer modal -->
 		<div class="mt-4">
@@ -148,13 +166,31 @@
 	opacity: 0.95;
 }
 
-.customer-load-percent {
+.customer-load-status {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	width: 100%;
+	margin-top: 6px;
+	padding: 0 10px;
 	font-size: 0.72rem;
 	font-weight: 700;
-	margin-right: 8px;
+	line-height: 1.25;
 	color: rgb(var(--v-theme-primary));
-	min-width: 42px;
-	text-align: right;
+	box-sizing: border-box;
+	white-space: nowrap;
+}
+
+.customer-load-status__count {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.customer-load-status__percent {
+	flex: 0 0 auto;
+	font-variant-numeric: tabular-nums;
 }
 
 .customer-autocomplete:hover {
@@ -195,9 +231,9 @@
 		padding-right: 0;
 	}
 
-	.customer-load-percent {
-		min-width: 34px;
-		margin-right: 4px;
+	.customer-load-status {
+		padding: 0 4px;
+		font-size: 0.68rem;
 	}
 }
 </style>
@@ -208,6 +244,7 @@ import { storeToRefs } from "pinia";
 import _ from "lodash";
 import UpdateCustomer from "../dialogs/customer/UpdateCustomer.vue";
 import { useCustomersStore } from "../../../stores/customersStore.js";
+import { customerMatchesSearchTerm } from "../../../stores/customers/customerSearch";
 import { useOnlineStatus } from "../../../composables/core/useOnlineStatus";
 import { useToastStore } from "../../../stores/toastStore.js";
 import { useUIStore } from "../../../stores/uiStore.js";
@@ -230,6 +267,7 @@ export default {
 			customers,
 			filteredCustomers,
 			loadingCustomers,
+			searchingCustomers,
 			isCustomerBackgroundLoading,
 			loadProgress,
 			customersLoaded,
@@ -243,6 +281,7 @@ export default {
 		const isMenuOpen = ref(false);
 		const customerDropdown = ref(null);
 		const readonlyState = ref(false);
+		const pendingCustomerSearchInput = ref(false);
 
 		let scrollContainer = null;
 
@@ -253,23 +292,27 @@ export default {
 			() => loadingCustomers.value || isCustomerBackgroundLoading.value,
 		);
 		const isCustomerSearchLocked = computed(() => loadingCustomers.value && customers.value.length === 0);
+		const isCustomerLookupPending = computed(
+			() => pendingCustomerSearchInput.value || searchingCustomers.value,
+		);
 		const customerLoadPercent = computed(() =>
 			Math.max(0, Math.min(100, Math.round(loadProgress.value || 0))),
 		);
+		const customerLoadedCountLabel = computed(
+			() => `${Number(loadedCustomerCount.value || 0).toLocaleString()} ${__("customers")}`,
+		);
 		const customerFieldLabel = computed(() =>
-			showCustomerLoadProgress.value
-				? `${frappe._("Loading customers")} ${customerLoadPercent.value}%`
-				: frappe._("Customer"),
+			showCustomerLoadProgress.value ? frappe._("Loading customers") : frappe._("Customer"),
 		);
 		const customerFieldPlaceholder = computed(() =>
-			showCustomerLoadProgress.value
-				? `${__("Loading customers...")} ${customerLoadPercent.value}%`
-				: __("Search customer"),
+			showCustomerLoadProgress.value ? __("Loading customers...") : __("Search customer"),
 		);
 		const customerNoDataText = computed(() =>
-			showCustomerLoadProgress.value
-				? `${__("Loading customers...")} ${customerLoadPercent.value}%`
-				: __("Customers not found"),
+			isCustomerLookupPending.value
+				? __("Searching customers...")
+				: showCustomerLoadProgress.value
+					? `${__("Loading customers...")} ${customerLoadPercent.value}%`
+					: __("Customers not found"),
 		);
 		const hasReadyCustomerCache = () =>
 			Boolean(
@@ -287,8 +330,15 @@ export default {
 			}).format(numericValue);
 		};
 
-		const searchDebounce = _.debounce((term) => {
-			customersStore.queueSearch(term || "");
+		let customerSearchInputRequestId = 0;
+		const searchDebounce = _.debounce(async (term, requestId) => {
+			try {
+				await customersStore.queueSearch(term || "");
+			} finally {
+				if (requestId === customerSearchInputRequestId) {
+					pendingCustomerSearchInput.value = false;
+				}
+			}
 		}, 300);
 
 		const ensureCustomersForProfile = (profile) => {
@@ -367,6 +417,10 @@ export default {
 		const onCustomerMenuToggle = (isOpen) => {
 			isMenuOpen.value = isOpen;
 			if (isOpen) {
+				searchDebounce.cancel();
+				customerSearchInputRequestId += 1;
+				pendingCustomerSearchInput.value = false;
+				void customersStore.queueSearch("");
 				internalCustomer.value = null;
 				nextTick(() => {
 					setTimeout(() => {
@@ -422,17 +476,17 @@ export default {
 				return;
 			}
 			const term = value || "";
-			searchDebounce(term);
+			customerSearchInputRequestId += 1;
+			pendingCustomerSearchInput.value = true;
+			searchDebounce(term, customerSearchInputRequestId);
 		};
 
-		const handleEnter = (event) => {
-			const inputText = event.target.value?.toLowerCase() || "";
-			const matched = customers.value.find((cust) => {
-				return (
-					cust.customer_name?.toLowerCase().includes(inputText) ||
-					cust.name?.toLowerCase().includes(inputText)
-				);
-			});
+		const handleEnter = async (event) => {
+			const inputText = event.target.value || "";
+			await searchDebounce.flush();
+			const matched = customers.value.find((customer) =>
+				customerMatchesSearchTerm(customer, inputText),
+			);
 
 			if (!matched) {
 				return;
@@ -448,6 +502,13 @@ export default {
 		};
 
 		const new_customer = () => {
+			if (isCustomerLookupPending.value) {
+				toastStore.show({
+					title: __("Please wait for customer search to finish"),
+					color: "warning",
+				});
+				return;
+			}
 			customersStore.openUpdateCustomerDialog(null);
 		};
 
@@ -564,7 +625,9 @@ export default {
 			isCustomerBackgroundLoading,
 			showCustomerLoadProgress,
 			isCustomerSearchLocked,
+			isCustomerLookupPending,
 			customerLoadPercent,
+			customerLoadedCountLabel,
 			customerFieldLabel,
 			customerFieldPlaceholder,
 			customerNoDataText,

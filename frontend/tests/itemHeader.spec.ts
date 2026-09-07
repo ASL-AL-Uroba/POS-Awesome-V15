@@ -34,7 +34,8 @@ const VBtnStub = defineComponent({
 
 const VExpandTransitionStub = defineComponent({
 	setup(_, { slots }) {
-		return () => h("div", { class: "expand-transition-stub" }, slots.default?.());
+		return () =>
+			h("div", { class: "expand-transition-stub" }, slots.default?.());
 	},
 });
 
@@ -58,12 +59,13 @@ const VTextFieldStub = defineComponent({
 		label: { type: String, default: "" },
 		disabled: { type: Boolean, default: false },
 	},
-	emits: ["update:modelValue"],
+	emits: ["update:modelValue", "keydown"],
 	setup(props, { attrs, emit, slots }) {
 		return () =>
 			h("label", { class: "v-text-field-stub" }, [
 				h("span", { class: "field-label" }, props.label),
 				h("input", {
+					...attrs,
 					"data-test": attrs["data-test"] ?? "text-field-input",
 					value: props.modelValue,
 					disabled: props.disabled,
@@ -72,6 +74,7 @@ const VTextFieldStub = defineComponent({
 							"update:modelValue",
 							(event.target as HTMLInputElement).value,
 						),
+					onKeydown: (event: KeyboardEvent) => emit("keydown", event),
 				}),
 				slots["append-inner"]?.(),
 			]);
@@ -117,5 +120,47 @@ describe("ItemHeader", () => {
 		expect(progressBar.attributes("data-model-value")).toBe("42");
 		expect(wrapper.text()).toContain("Syncing offline catalog...");
 		expect(wrapper.text()).toContain("128 items synced");
+	});
+
+	it("exposes Counter Grid search as a linked active-descendant combobox", async () => {
+		const wrapper = mount(ItemHeader, {
+			props: {
+				searchInput: "panadol",
+				qtyInput: 1,
+				posProfile: {
+					posa_input_qty: false,
+					posa_enable_camera_scanning: false,
+				},
+				searchCombobox: true,
+				searchExpanded: true,
+				searchControls: "pharmacy-item-search-results-grid",
+				searchActiveDescendant: "pharmacy-item-result-41-33-31-30-36",
+			},
+			global: {
+				mocks: {
+					frappe: { _: (value: string) => value },
+					__: (value: string) => value,
+				},
+				components: {
+					VRow: VRowStub,
+					VCol: VColStub,
+					VBtn: VBtnStub,
+					VExpandTransition: VExpandTransitionStub,
+					VProgressLinear: VProgressLinearStub,
+					VTextField: VTextFieldStub,
+				},
+			},
+		});
+
+		const input = wrapper.get('input[data-testid="pos-item-search"]');
+		expect(input.attributes()).toMatchObject({
+			role: "combobox",
+			"aria-label": "Search saleable items",
+			"aria-autocomplete": "list",
+			"aria-expanded": "true",
+			"aria-controls": "pharmacy-item-search-results-grid",
+			"aria-activedescendant": "pharmacy-item-result-41-33-31-30-36",
+		});
+		expect(wrapper.findAll('[role="combobox"]')).toHaveLength(1);
 	});
 });

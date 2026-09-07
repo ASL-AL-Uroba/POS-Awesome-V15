@@ -48,13 +48,17 @@ async function loadWriteQueueModule(seedRows: SeedEntry[]) {
 				}),
 				first: vi.fn(async () => {
 					firstTxStates.push(txActive);
-					return rows.find((row) => String((row as any)[field]) === value);
+					return rows.find(
+						(row) => String((row as any)[field]) === value,
+					);
 				}),
 			})),
 		})),
 		put: vi.fn(async (entry: SeedEntry) => {
 			putTxStates.push(txActive);
-			const index = rows.findIndex((row) => row.queue_id === entry.queue_id);
+			const index = rows.findIndex(
+				(row) => row.queue_id === entry.queue_id,
+			);
 			if (index >= 0) {
 				rows[index] = clone(entry);
 				return entry.queue_id;
@@ -68,7 +72,8 @@ async function loadWriteQueueModule(seedRows: SeedEntry[]) {
 		add: vi.fn(async (entry: SeedEntry) => {
 			addTxStates.push(txActive);
 			const queueId =
-				entry.queue_id ?? Math.max(0, ...rows.map((row) => row.queue_id || 0)) + 1;
+				entry.queue_id ??
+				Math.max(0, ...rows.map((row) => row.queue_id || 0)) + 1;
 			rows.push(clone({ ...entry, queue_id: queueId }));
 			return queueId;
 		}),
@@ -98,6 +103,7 @@ async function loadWriteQueueModule(seedRows: SeedEntry[]) {
 	vi.doMock("../src/offline/db", () => ({
 		checkDbHealth: vi.fn().mockResolvedValue(true),
 		initPromise: Promise.resolve(),
+		startupInitPromise: Promise.resolve(),
 		memory,
 		db: {
 			isOpen: vi.fn(() => true),
@@ -108,14 +114,20 @@ async function loadWriteQueueModule(seedRows: SeedEntry[]) {
 				}
 				return genericTable;
 			}),
-			transaction: vi.fn(async (_mode: string, _table: unknown, callback: () => Promise<unknown>) => {
-				txActive = true;
-				try {
-					return await callback();
-				} finally {
-					txActive = false;
-				}
-			}),
+			transaction: vi.fn(
+				async (
+					_mode: string,
+					_table: unknown,
+					callback: () => Promise<unknown>,
+				) => {
+					txActive = true;
+					try {
+						return await callback();
+					} finally {
+						txActive = false;
+					}
+				},
+			),
 		},
 	}));
 
@@ -152,7 +164,9 @@ describe("write queue transaction safety", () => {
 	});
 
 	it("claims retryable queue entries with the initial ordered read inside the rw transaction", async () => {
-		const staleTimestamp = new Date(Date.now() - 6 * 60 * 1000).toISOString();
+		const staleTimestamp = new Date(
+			Date.now() - 6 * 60 * 1000,
+		).toISOString();
 		const freshTimestamp = new Date(Date.now() - 60 * 1000).toISOString();
 		const { module, rows, memory, sortByTxStates, putTxStates } =
 			await loadWriteQueueModule([
@@ -217,10 +231,16 @@ describe("write queue transaction safety", () => {
 
 		expect(sortByTxStates[0]).toBe(true);
 		expect(putTxStates).toEqual([true, true, true]);
-		expect(claimed.map((entry: SeedEntry) => entry.queue_id)).toEqual([1, 2, 4]);
-		expect(claimed.every((entry: SeedEntry) => entry.status === "syncing")).toBe(true);
+		expect(claimed.map((entry: SeedEntry) => entry.queue_id)).toEqual([
+			1, 2, 4,
+		]);
+		expect(
+			claimed.every((entry: SeedEntry) => entry.status === "syncing"),
+		).toBe(true);
 		expect(claimed[1]?.last_error).toBe("Recovered stale sync lease");
-		expect(rows.find((entry) => entry.queue_id === 3)?.status).toBe("syncing");
+		expect(rows.find((entry) => entry.queue_id === 3)?.status).toBe(
+			"syncing",
+		);
 		expect(memory.offline_invoices).toHaveLength(5);
 	});
 
@@ -321,7 +341,9 @@ describe("write queue transaction safety", () => {
 			{
 				queue_id: 41,
 				entity_type: "payment",
-				payload: { args: { payload: { client_request_id: "pay-041" } } },
+				payload: {
+					args: { payload: { client_request_id: "pay-041" } },
+				},
 				created_at: "2026-04-18T14:00:00.000Z",
 				last_attempt_at: "2026-04-18T14:05:00.000Z",
 				retry_count: 1,
@@ -349,7 +371,9 @@ describe("write queue transaction safety", () => {
 				{
 					queue_id: 10,
 					entity_type: "customer",
-					payload: { args: { customer_id: "CUST-001", note: "old-a" } },
+					payload: {
+						args: { customer_id: "CUST-001", note: "old-a" },
+					},
 					created_at: "2026-04-18T11:00:00.000Z",
 					last_attempt_at: null,
 					retry_count: 0,
@@ -360,7 +384,9 @@ describe("write queue transaction safety", () => {
 				{
 					queue_id: 11,
 					entity_type: "customer",
-					payload: { args: { customer_id: "CUST-002", note: "old-b" } },
+					payload: {
+						args: { customer_id: "CUST-002", note: "old-b" },
+					},
 					created_at: "2026-04-18T11:01:00.000Z",
 					last_attempt_at: null,
 					retry_count: 0,
@@ -371,7 +397,9 @@ describe("write queue transaction safety", () => {
 				{
 					queue_id: 12,
 					entity_type: "customer",
-					payload: { args: { customer_id: "CUST-003", note: "old-c" } },
+					payload: {
+						args: { customer_id: "CUST-003", note: "old-c" },
+					},
 					created_at: "2026-04-18T11:02:00.000Z",
 					last_attempt_at: "2026-04-18T10:30:00.000Z",
 					retry_count: 2,
@@ -381,25 +409,28 @@ describe("write queue transaction safety", () => {
 				},
 			]);
 
-		await module.updateQueuedPayloads("customer", (payload: Record<string, any>) => ({
-			...payload,
-			args: {
-				...payload.args,
-				note: `${payload.args.note}-updated`,
-			},
-		}));
+		await module.updateQueuedPayloads(
+			"customer",
+			(payload: Record<string, any>) => ({
+				...payload,
+				args: {
+					...payload.args,
+					note: `${payload.args.note}-updated`,
+				},
+			}),
+		);
 
 		expect(sortByTxStates[0]).toBe(true);
 		expect(putTxStates).toEqual([true, true]);
-		expect(rows.find((entry) => entry.queue_id === 10)?.payload.args.note).toBe(
-			"old-a-updated",
-		);
-		expect(rows.find((entry) => entry.queue_id === 11)?.payload.args.note).toBe(
-			"old-b",
-		);
-		expect(rows.find((entry) => entry.queue_id === 12)?.payload.args.note).toBe(
-			"old-c-updated",
-		);
+		expect(
+			rows.find((entry) => entry.queue_id === 10)?.payload.args.note,
+		).toBe("old-a-updated");
+		expect(
+			rows.find((entry) => entry.queue_id === 11)?.payload.args.note,
+		).toBe("old-b");
+		expect(
+			rows.find((entry) => entry.queue_id === 12)?.payload.args.note,
+		).toBe("old-c-updated");
 		expect(memory.offline_customers).toHaveLength(2);
 	});
 

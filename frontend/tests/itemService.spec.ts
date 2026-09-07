@@ -69,6 +69,31 @@ describe("itemService API surface", () => {
 			},
 		);
 	});
+
+	it("unwraps hot item catalog responses through getHotItemsData", async () => {
+		const items = [{ item_code: "ITEM-HOT" }];
+		vi.mocked(api.callEnvelope).mockResolvedValue(
+			successEnvelope(items) as never,
+		);
+
+		await expect(
+			itemService.getHotItemsData({
+				pos_profile: "{}",
+				price_list: "Retail",
+				limit: 5000,
+			}),
+		).resolves.toBe(items);
+
+		expect(api.callEnvelope).toHaveBeenCalledWith(
+			"posawesome.posawesome.api.items.get_hot_items",
+			{
+				pos_profile: "{}",
+				price_list: "Retail",
+				limit: 5000,
+			},
+			{ signal: undefined },
+		);
+	});
 });
 
 describe("itemService.createItem", () => {

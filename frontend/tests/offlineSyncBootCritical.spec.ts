@@ -16,31 +16,46 @@ const cacheMocks = vi.hoisted(() => ({
 }));
 
 const bootstrapSnapshotMocks = vi.hoisted(() => ({
-	refreshBootstrapSnapshotFromCaches: vi.fn(({ currentSnapshot, registerData, cacheState }) => ({
-		...(currentSnapshot || {}),
-		build_version: currentSnapshot?.build_version || "build-1",
-		profile_name: registerData?.pos_profile?.name || currentSnapshot?.profile_name || null,
-		profile_modified:
-			registerData?.pos_profile?.modified ||
-			currentSnapshot?.profile_modified ||
-			null,
-		prerequisites: {
-			...(currentSnapshot?.prerequisites || {}),
-			tax_inclusive:
-				cacheState?.taxInclusive === null || typeof cacheState?.taxInclusive === "undefined"
-					? "missing"
-					: "ready",
-		},
-	})),
+	refreshBootstrapSnapshotFromCaches: vi.fn(
+		({ currentSnapshot, registerData, cacheState }) => ({
+			...(currentSnapshot || {}),
+			build_version: currentSnapshot?.build_version || "build-1",
+			profile_name:
+				registerData?.pos_profile?.name ||
+				currentSnapshot?.profile_name ||
+				null,
+			profile_modified:
+				registerData?.pos_profile?.modified ||
+				currentSnapshot?.profile_modified ||
+				null,
+			prerequisites: {
+				...(currentSnapshot?.prerequisites || {}),
+				tax_inclusive:
+					cacheState?.taxInclusive === null ||
+					typeof cacheState?.taxInclusive === "undefined"
+						? "missing"
+						: "ready",
+			},
+		}),
+	),
 }));
 
 const syncStateMocks = vi.hoisted(() => ({
 	setSyncResourceState: vi.fn().mockResolvedValue(undefined),
 }));
 
+const repositoryMocks = vi.hoisted(() => ({
+	currencyRateRepository: {
+		clear: vi.fn().mockResolvedValue(undefined),
+		upsertMany: vi.fn().mockResolvedValue(undefined),
+		deleteByNames: vi.fn().mockResolvedValue(undefined),
+	},
+}));
+
 vi.mock("../src/offline/cache", () => cacheMocks);
 vi.mock("../src/offline/bootstrapSnapshot", () => bootstrapSnapshotMocks);
 vi.mock("../src/offline/sync/syncState", () => syncStateMocks);
+vi.mock("../src/offline/repositories", () => repositoryMocks);
 
 import {
 	syncBootstrapConfigResource,
@@ -107,7 +122,9 @@ describe("boot-critical offline sync adapters", () => {
 		});
 
 		expect(cacheMocks.setTaxInclusiveSetting).toHaveBeenCalledWith(false);
-		expect(bootstrapSnapshotMocks.refreshBootstrapSnapshotFromCaches).toHaveBeenCalledWith(
+		expect(
+			bootstrapSnapshotMocks.refreshBootstrapSnapshotFromCaches,
+		).toHaveBeenCalledWith(
 			expect.objectContaining({
 				registerData: {
 					pos_profile: {
@@ -122,11 +139,14 @@ describe("boot-critical offline sync adapters", () => {
 			}),
 		);
 		expect(cacheMocks.setBootstrapSnapshot).toHaveBeenCalled();
-		expect(cacheMocks.savePriceListMetaCache).toHaveBeenCalledWith("POS-1", {
-			price_lists: ["Retail"],
-			selected_price_list: "Retail",
-			price_list_currency: "PKR",
-		});
+		expect(cacheMocks.savePriceListMetaCache).toHaveBeenCalledWith(
+			"POS-1",
+			{
+				price_lists: ["Retail"],
+				selected_price_list: "Retail",
+				price_list_currency: "PKR",
+			},
+		);
 		expect(syncStateMocks.setSyncResourceState).toHaveBeenCalledWith(
 			expect.objectContaining({
 				resourceId: "bootstrap_config",
@@ -159,6 +179,17 @@ describe("boot-critical offline sync adapters", () => {
 						key: "currency_options",
 						modified: "2026-04-09T10:02:00",
 						data: [{ name: "PKR" }, { name: "USD" }],
+					},
+					{
+						key: "currency_rate::FX-USD-PKR",
+						modified: "2026-04-09T10:06:00",
+						data: {
+							name: "FX-USD-PKR",
+							from_currency: "USD",
+							to_currency: "PKR",
+							exchange_rate: 279.5,
+							date: "2026-04-09",
+						},
 					},
 					{
 						key: "exchange_rate::USD::PKR",
@@ -202,10 +233,10 @@ describe("boot-critical offline sync adapters", () => {
 			})),
 		});
 
-		expect(cacheMocks.saveCurrencyOptionsCache).toHaveBeenCalledWith("POS-1", [
-			{ name: "PKR" },
-			{ name: "USD" },
-		]);
+		expect(cacheMocks.saveCurrencyOptionsCache).toHaveBeenCalledWith(
+			"POS-1",
+			[{ name: "PKR" }, { name: "USD" }],
+		);
 		expect(cacheMocks.saveExchangeRateCache).toHaveBeenCalledWith({
 			profileName: "POS-1",
 			company: "Test Co",
@@ -214,6 +245,18 @@ describe("boot-critical offline sync adapters", () => {
 			date: "2026-04-09",
 			exchange_rate: 279.5,
 		});
+		expect(
+			repositoryMocks.currencyRateRepository.clear,
+		).toHaveBeenCalledOnce();
+		expect(
+			repositoryMocks.currencyRateRepository.upsertMany,
+		).toHaveBeenCalledWith([
+			expect.objectContaining({
+				name: "FX-USD-PKR",
+				profile_name: "POS-1",
+				company: "Test Co",
+			}),
+		]);
 		expect(cacheMocks.savePaymentMethodCurrencyCache).toHaveBeenCalledWith(
 			"Test Co",
 			{ Cash: "PKR", Card: "USD" },
@@ -232,6 +275,64 @@ describe("boot-critical offline sync adapters", () => {
 		);
 	});
 
+	it("consumes every page of the currency matrix before persisting sync state", async () => {
+		const fetcher = vi
+			.fn()
+			.mockResolvedValueOnce({
+				changes: [
+					{
+						key: "currency_options",
+						data: [{ name: "PKR" }, { name: "USD" }],
+					},
+				],
+				has_more: true,
+				next_offset: 1,
+				next_watermark: null,
+			})
+			.mockResolvedValueOnce({
+				changes: [
+					{
+						key: "currency_rate::FX-USD-PKR",
+						modified: "2026-04-09T10:06:00",
+						data: {
+							name: "FX-USD-PKR",
+							from_currency: "USD",
+							to_currency: "PKR",
+							exchange_rate: 279.5,
+							date: "2026-04-09",
+						},
+					},
+					{
+						key: "exchange_rate::USD::PKR",
+						data: {
+							from_currency: "USD",
+							to_currency: "PKR",
+							exchange_rate: 279.5,
+							date: "2026-04-09",
+						},
+					},
+				],
+				has_more: false,
+				next_offset: null,
+				next_watermark: "2026-04-09T10:06:00",
+			});
+
+		const result = await syncCurrencyMatrixResource({
+			posProfile: { name: "POS-1", company: "Test Co" },
+			watermark: null,
+			fetcher,
+		});
+
+		expect(fetcher).toHaveBeenNthCalledWith(
+			2,
+			expect.objectContaining({ offset: 1, watermark: null }),
+		);
+		expect(cacheMocks.saveCurrencyOptionsCache).toHaveBeenCalledOnce();
+		expect(cacheMocks.saveExchangeRateCache).toHaveBeenCalledOnce();
+		expect(result.watermark).toBe("2026-04-09T10:06:00");
+		expect(syncStateMocks.setSyncResourceState).toHaveBeenCalledTimes(1);
+	});
+
 	it("marks bootstrap sync limited when the backend requires a full resync", async () => {
 		const result = await syncBootstrapConfigResource({
 			posProfile: {
@@ -239,6 +340,7 @@ describe("boot-critical offline sync adapters", () => {
 				company: "Test Co",
 				modified: "2026-04-09T10:05:00",
 			},
+			watermark: "legacy-watermark",
 			fetcher: vi.fn(async () => ({
 				schema_version: "2026-04-09",
 				full_resync_required: true,
@@ -250,10 +352,12 @@ describe("boot-critical offline sync adapters", () => {
 		});
 
 		expect(result.status).toBe("limited");
+		expect(result.watermark).toBeNull();
 		expect(syncStateMocks.setSyncResourceState).toHaveBeenCalledWith(
 			expect.objectContaining({
 				resourceId: "bootstrap_config",
 				status: "limited",
+				watermark: null,
 			}),
 		);
 	});
