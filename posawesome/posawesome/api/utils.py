@@ -152,7 +152,9 @@ def expand_item_groups(item_groups):
         return item_groups
 
     try:
-        from erpnext.utilities.doctype.item_group.item_group import get_child_groups
+        from erpnext.setup.doctype.item_group.item_group import (
+            get_child_item_groups as get_child_groups,
+        )
     except Exception:
         get_child_groups = None
 
@@ -165,7 +167,9 @@ def expand_item_groups(item_groups):
         is_group = frappe.db.get_value("Item Group", group, "is_group")
 
         if is_group:
-            # If it's a parent group, get all its children
+            # If it's a parent group, get all its children. ERPNext's helper
+            # also returns the group itself; the DB fallback returns only
+            # descendants.
             if get_child_groups:
                 try:
                     descendants = get_child_groups(group) or []

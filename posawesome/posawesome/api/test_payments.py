@@ -65,7 +65,7 @@ class FakePaymentEntry:
 def _install_stubs():
     frappe_module = types.ModuleType("frappe")
     frappe_utils = types.ModuleType("frappe.utils")
-    accounts_party = types.ModuleType("erpnext.accounts.party")
+    bank_account_module = types.ModuleType("erpnext.accounts.doctype.bank_account.bank_account")
     accounts_utils = types.ModuleType("erpnext.accounts.utils")
     payment_request_module = types.ModuleType("erpnext.accounts.doctype.payment_request.payment_request")
     utilities_module = types.ModuleType("posawesome.posawesome.api.utilities")
@@ -146,14 +146,14 @@ def _install_stubs():
 
     accounts_utils.reconcile_against_document = _reconcile_against_document
 
-    accounts_party.get_party_bank_account = lambda *args, **kwargs: None
+    bank_account_module.get_party_bank_account = lambda *args, **kwargs: None
     payment_request_module.get_dummy_message = lambda *_args, **_kwargs: ""
     payment_request_module.get_existing_payment_request_amount = lambda *_args, **_kwargs: 0
     utilities_module.ensure_child_doctype = lambda *_args, **_kwargs: None
 
     sys.modules["frappe"] = frappe_module
     sys.modules["frappe.utils"] = frappe_utils
-    sys.modules["erpnext.accounts.party"] = accounts_party
+    sys.modules["erpnext.accounts.doctype.bank_account.bank_account"] = bank_account_module
     sys.modules["erpnext.accounts.utils"] = accounts_utils
     sys.modules["erpnext.accounts.doctype.payment_request.payment_request"] = payment_request_module
     sys.modules["posawesome.posawesome.api.utilities"] = utilities_module
