@@ -495,6 +495,18 @@ export function useScanProcessor(context: ScanProcessorContext) {
 			}
 		}
 
+		// Decode separator-encoded quantity: {barcode}*{qty} (printed by label printer)
+		if (!scaleResponse?.item_code && qtyFromBarcode === null) {
+			const starIdx = scannedCode.lastIndexOf("*");
+			if (starIdx > 0) {
+				const candidateQty = parseInt(scannedCode.slice(starIdx + 1), 10);
+				if (candidateQty > 0) {
+					searchCode = scannedCode.slice(0, starIdx);
+					qtyFromBarcode = candidateQty;
+				}
+			}
+		}
+
 		// First try to find exact match by processed code using the pre-built index
 		const index = barcodeIndex.ensureBarcodeIndex();
 		// Use barcodeIndex composable methods if available, else local logic
@@ -527,6 +539,15 @@ export function useScanProcessor(context: ScanProcessorContext) {
 				return barcodeMatch || item.item_code === searchCode;
 			});
 		}
+		if (foundItem && qtyFromBarcode === null) {
+			const matchedBarcode =
+				Array.isArray(foundItem.item_barcode) &&
+				foundItem.item_barcode.find((b: any) => b.barcode === searchCode);
+			if (matchedBarcode && matchedBarcode.posa_qty > 0) {
+				qtyFromBarcode = matchedBarcode.posa_qty;
+			}
+		}
+		
 		logScanFlow("Parsed scan code", {
 			scannedCode,
 			searchCode,

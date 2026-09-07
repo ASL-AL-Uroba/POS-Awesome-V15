@@ -226,6 +226,9 @@ export const PAGE_FORMAT_PRESETS: PageFormatPreset[] = [
 	{ label: "25 × 25 mm", value: "25x25mm", type: "thermal", widthMm: 25, heightMm: 25 },
 	{ label: "38 × 25 mm", value: "38x25mm", type: "thermal", widthMm: 38, heightMm: 25 },
 	{ label: "50 × 25 mm", value: "50x25mm", type: "thermal", widthMm: 50, heightMm: 25 },
+	{ label: "58 × 30 mm", value: "58x30mm", type: "thermal", widthMm: 58, heightMm: 30 },
+	{ label: "58 × 40 mm", value: "58x40mm", type: "thermal", widthMm: 58, heightMm: 40 },
+	{ label: "62 × 29 mm", value: "62x29mm", type: "thermal", widthMm: 62, heightMm: 29 },
 	{ label: "75 × 25 mm", value: "75x25mm", type: "thermal", widthMm: 75, heightMm: 25 },
 	{ label: "100 × 50 mm", value: "100x50mm", type: "thermal", widthMm: 100, heightMm: 50 },
 	{ label: "100 × 100 mm", value: "100x100mm", type: "thermal", widthMm: 100, heightMm: 100 },
@@ -348,6 +351,7 @@ export function useBarcodePrintOutput() {
 	const symbologyOptions = computed(() => ["auto", "EAN13", "EAN8", "UPC", "ITF14", "ITF", "GS1_128", "CODE128", "CODE39", "CODABAR"]);
 	const outputFormat = ref<"html" | "zpl" | "epl">("html");
 	const includeWarehouseLocation = ref(false);
+	const encodeQtyInBarcode = ref(true);
 	const printerDpi = ref<PrinterDPI>(203);
 	const activeDesignerTemplate = ref<string | null>(null);
 	const selectedPrinterProfile = ref<PrinterProfile | null>(null);
@@ -726,15 +730,26 @@ export function useBarcodePrintOutput() {
 		items.forEach((item) => {
 			const itemSym = getItemSymbology(item);
 			const effectiveSym = itemSym === "auto" ? guessSymbologyFromBarcode(item.barcode) : itemSym;
-			const dims = calculateBarcodeDimensions(effectiveSym, ctx, item.barcode?.length);
-			const jsBarcode = getSymbologyForJsBarcode(effectiveSym);
-			const ean128Attr = jsBarcode.ean128 ? ' jsbarcode-ean128="true"' : "";
 			const labelsCount = Math.max(1, Math.round(Number(item.qty) || 1));
+
+			// Quantity-embedded label: print ONE label whose barcode carries `{barcode}*{qty}`
+			// rather than `qty` identical labels. The scanner decodes it back to a quantity
+			// (see useScanProcessor / useItemsSelectorSearch). `*` is not encodable in
+			// EAN13/EAN8/UPC/ITF14/ITF, so the encoded value is always rendered as CODE128 and
+			// sized from its own length — the appended suffix adds modules.
+			const encodeQty = encodeQtyInBarcode.value && labelsCount > 1;
+			const barcodeValue = encodeQty ? `${item.barcode || ""}*${labelsCount}` : item.barcode || "";
+			const renderSym = encodeQty ? "CODE128" : effectiveSym;
+			const renderCount = encodeQty ? 1 : labelsCount;
+
+			const dims = calculateBarcodeDimensions(renderSym, ctx, barcodeValue.length);
+			const jsBarcode = getSymbologyForJsBarcode(renderSym);
+			const ean128Attr = jsBarcode.ean128 ? ' jsbarcode-ean128="true"' : "";
 			const safeItemName = escapeHtml(item.item_name || item.item_code || "");
-			const safeBarcode = escapeHtml(item.barcode || "");
+			const safeBarcode = escapeHtml(barcodeValue);
 			const safeUom = escapeHtml(item.uom || "");
 
-			for (let i = 0; i < labelsCount; i++) {
+			for (let i = 0; i < renderCount; i++) {
 				let batchSerialHtml = "";
 				if (includeBatchSerial.value) {
 					let text = "";
@@ -905,9 +920,96 @@ export function useBarcodePrintOutput() {
 		const printWindow = openPrintPopup();
 		if (!printWindow) return;
 
+		const size = parseLabelSize();
 		const style = getPrintStyles();
 		const content = generatePrintContent(itemsToPrint);
 
+		if (size.type !== "A4") {
+			// Chrome ignores `@page { size: Wmm Hmm }` when printing, so a label-format job comes
+			// out laid onto A4. Render to a PDF whose page box jsPDF sets explicitly, then hand
+			// that to the print dialog via autoPrint instead of printing the DOM directly.
+			const labelWidthMm = size.width ?? 0;
+			const labelHeightMm = size.height ?? 0;
+			const labelCount = itemsToPrint.reduce((sum: number, item: any) => {
+				const labelsCount = Math.max(1, Math.round(Number(item.qty) || 1));
+				return sum + (encodeQtyInBarcode.value && labelsCount > 1 ? 1 : labelsCount);
+			}, 0);
+			const opt = {
+				margin: 0,
+				image: { type: "jpeg", quality: 0.98 },
+				// Cap the canvas at exactly N label heights; without it html2canvas measures the
+				// body taller than the content and emits a blank trailing page.
+				html2canvas: {
+					scale: 2,
+					useCORS: true,
+					height: Math.floor(labelCount * labelHeightMm * (96 / 25.4)),
+				},
+				// jsPDF swaps [w, h] to force portrait when w > h, so declare the real orientation.
+				jsPDF: {
+					unit: "mm",
+					format: [labelWidthMm, labelHeightMm],
+					orientation: labelWidthMm >= labelHeightMm ? "landscape" : "portrait",
+				},
+				// getPrintStyles() keeps `page-break-after: always` on .label for the window.print()
+				// path below; html2pdf honours CSS breaks by default, which would double-paginate
+				// on top of the page-height canvas slices.
+				pagebreak: { mode: ["avoid-all"] },
+			};
+
+			printWindow.document.write(`
+				<html>
+					<head>
+						<title>Print Barcodes</title>
+						<style>${style}</style>
+						<script src="/assets/posawesome/dist/js/libs/html2pdf.bundle.min.js"><\/script>
+						<script src="/assets/posawesome/dist/js/libs/JsBarcode.all.min.js"><\/script>
+					</head>
+					<body>
+						<div id="print-content">${content}</div>
+						<script>
+							window.onload = function() {
+								JsBarcode(".barcode").init();
+								var checkInterval = setInterval(function() {
+									var imgs = document.querySelectorAll('img.barcode');
+									var allLoaded = true;
+									for (var i = 0; i < imgs.length; i++) {
+										var img = imgs[i];
+										if (img.getAttribute('jsbarcode-format') && !img.complete) {
+											allLoaded = false;
+											break;
+										}
+									}
+									if (!allLoaded) return;
+									clearInterval(checkInterval);
+									var element = document.getElementById('print-content');
+									html2pdf().set(${JSON.stringify(opt)}).from(element).toPdf().get('pdf')
+										.then(function(pdf) {
+											pdf.autoPrint();
+											var iframe = document.createElement('iframe');
+											iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+											iframe.onload = function() {
+												setTimeout(function() {
+													iframe.contentWindow.focus();
+													iframe.contentWindow.print();
+												}, 200);
+											};
+											iframe.src = pdf.output('bloburl');
+											document.body.appendChild(iframe);
+										});
+								}, 50);
+							}
+						<\/script>
+					</body>
+				</html>
+			`);
+			printWindow.document.close();
+			logPrintEvent(itemsToPrint, "Browser", "Sent");
+			// The matchMedia("print") confirm listener below cannot observe a print raised from
+			// inside the blob iframe, so there is nothing to attach here.
+			return;
+		}
+
+		// A4: the browser print dialog lays out the grid correctly on its own.
 		printWindow.document.write(`
 			<html>
 				<head>
@@ -1198,6 +1300,7 @@ export function useBarcodePrintOutput() {
 		symbologyOptions,
 		outputFormat,
 		includeWarehouseLocation,
+		encodeQtyInBarcode,
 		printerDpi,
 		selectedPrinterProfile,
 		printerProfiles,

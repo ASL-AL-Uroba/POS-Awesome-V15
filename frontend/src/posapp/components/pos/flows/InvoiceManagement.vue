@@ -1459,6 +1459,7 @@
 					:items-per-page="5"
 					class="elevation-1"
 				>
+					<template #item.mode_of_payment="{ item }">{{ __(item.mode_of_payment) }}</template>
 					<template #item.amount="{ item }"
 						>{{ currencySymbol(selectedInvoiceDetail.currency) }}
 						{{ formatCurrency(item.amount || 0) }}</template
@@ -2030,7 +2031,10 @@ export default {
 			rate: 0,
 		},
 		partialStatusItems: ["All", "Partly Paid", "Unpaid", "Overdue"],
-		historyStatusItems: ["All", "Paid", "Partly Paid", "Unpaid", "Overdue", "Credit Note Issued"],
+		historyStatusItems: ["All", "Paid", "Partly Paid", "Unpaid", "Overdue", "Credit Note Issued"].map((s) => ({
+				title: __(s),
+				value: s,
+			})),
 		partialHeaders: [
 			{ title: __("Invoice"), key: "name" },
 			{ title: __("Customer"), key: "customer_name" },

@@ -197,13 +197,23 @@ export async function save_and_clear_invoice(context: any) {
 	const doc = get_invoice_doc(context);
 
 	try {
+		if (doc.name || doc.items.length) {
+			if (!doc.customer) {
+				context.toastStore.show({
+					title: __("Please select Customer first"),
+					color: "error",
+				});
+				return;
+			}
+		}
+
 		if (doc.name) {
 			old_invoice = await context.update_invoice(doc);
 		} else if (doc.items.length) {
 			old_invoice = await context.update_invoice(doc);
 		} else {
 			context.toastStore.show({
-				title: `Nothing to save`,
+				title: __("Nothing to save"),
 				color: "error",
 			});
 		}
@@ -213,7 +223,7 @@ export async function save_and_clear_invoice(context: any) {
 
 	if (!old_invoice) {
 		context.toastStore.show({
-			title: `Error saving the current invoice`,
+			title: __("Error saving the current invoice"),
 			color: "error",
 		});
 	} else {

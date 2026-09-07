@@ -211,7 +211,7 @@ def _fetch_barcodes(item_codes: Tuple[str, ...]):
         return []
     return frappe.get_all(
         "Item Barcode",
-        fields=["parent", "barcode", "barcode_type", "uom"],
+        fields=["parent", "barcode", "barcode_type", "uom", "posa_qty"],
         filters={"parent": ["in", item_codes]},
     )
 
@@ -808,6 +808,7 @@ class ItemDetailAggregator:
                 "barcode": row.barcode,
                 "barcode_type": getattr(row, "barcode_type", ""),
                 "uom": row.uom,
+                "posa_qty": getattr(row, "posa_qty", 0) or 0,
             })
 
         batch_map: Dict[str, List[Dict[str, object]]] = {}

@@ -36,7 +36,8 @@
 	padding: 0;
 	box-sizing: border-box;
 	will-change: width, height;
-	contain: layout style;
+	/* contain: layout would prevent Firefox from calculating table cell widths correctly */
+	contain: style;
 }
 
 /* Items table container */
@@ -453,7 +454,14 @@
 	box-shadow: inset 3px 0 0 var(--pos-primary);
 }
 
-.posa-cart-table td > div {
+/* Expanded row cell must grow to fit content, not be clipped at 60px */
+.posa-cart-table td.posa-expanded-row-cell {
+	height: auto !important;
+	padding: 0 !important;
+	vertical-align: top;
+}
+
+.posa-cart-table td:not(.posa-expanded-row-cell) > div {
 	width: 100%;
 	height: 100%;
 	display: flex;
@@ -470,6 +478,17 @@
 	height: auto;
 	align-items: center;
 	justify-content: flex-start;
+}
+
+/* Expanded row cell must never inherit td>div flex-centering — Firefox resolves
+   width:100% on a flex child with justify-content:center as shrink-to-content,
+   collapsing form fields to their minimum icon width. */
+.posa-expanded-row-cell > .posa-expanded-content {
+	display: block !important;
+	height: auto !important;
+	width: 100% !important;
+	align-items: initial;
+	justify-content: initial;
 }
 
 /* =================================================================
@@ -968,8 +987,9 @@
 	border: 1px solid var(--pos-border);
 	border-top: none;
 	animation: expandIn 0.3s ease forwards;
-	container-type: inline-size;
-	container-name: expanded-content;
+	/* container-type: inline-size breaks layout inside <td> in Firefox —
+	   the inline-size resolves to 0, collapsing all flex children */
+	display: block;
 	margin: 0;
 	position: relative;
 	overflow: visible;

@@ -8986,5 +8986,15 @@
 		"print_hide": 1,
 		"insert_after": "posa_below_cost_override_reason",
 		"name": "POS Invoice-posa_below_cost_override_details"
+	},
+	{
+		"doctype": "Custom Field",
+		"name": "Item Barcode-posa_qty",
+		"dt": "Item Barcode",
+		"fieldname": "posa_qty",
+		"label": "Quantity",
+		"fieldtype": "Float",
+		"insert_after": "uom",
+		"description": "When scanned in POS, item is added with this quantity instead of 1"
 	}
 ]

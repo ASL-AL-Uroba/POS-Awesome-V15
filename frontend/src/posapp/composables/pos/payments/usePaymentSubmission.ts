@@ -490,6 +490,13 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 		} = options;
 		const diff = unref(diff_payment) || 0;
 		const writeOffAmount = getEffectiveWriteOffAmount(doc, profile, diff);
+
+		// 0. Validate customer is selected. Must stay ahead of the below-cost policy check
+		// below, which can await a POS supervisor override dialog — there is no point asking
+		// for an approval on an invoice that cannot be submitted for want of a customer.
+		if (!doc.customer) {
+			throw new Error(__("Please select Customer first"));
+		}
 		const invalidPaymentRate = (doc?.payments || []).find(
 			(payment: any) =>
 				Math.abs(Number(payment?.posa_original_amount || 0)) > 0 &&
@@ -618,6 +625,7 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 			);
 			}
 		}
+
 
 		// 1. Ensure return payments are negative
 		if (doc.is_return) {

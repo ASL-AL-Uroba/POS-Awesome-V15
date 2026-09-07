@@ -16,6 +16,8 @@ Amended From,معدل من
 Amount,المبلغ
 Apply Customer Discount,تطبيق خصم العميل
 Apply For,التقديم لـ
+Gender,النوع
+Birthday (DD-MM-YYYY),تاريخ الميلاد
 Apply On,يطبق على
 Apply Rule On Brand,تطبيق القاعدة على العلامة التجارية
 Apply Rule On Item Code,تطبيق القاعدة على كود الصنف
@@ -124,6 +126,7 @@ Sales Summary,ملخص المبيعات
 Sales User,مستخدم المبيعات
 Scale Barcode Start With,يبدأ باركود الميزان بـ
 Search by Serial Number,البحث حسب الرقم التسلسلي
+"Search, scan or browse item",ابحث أو امسح أو تصفح الأصناف
 Selected POS Opening Shift should be open.,يجب أن تكون وردية فتح نقطة البيع المحددة مفتوحة
 Send invoice to submit after printing,إرسال الفاتورة للإعتماد بعد الطباعة
 Set Posting Date,تعيين تاريخ النشر
@@ -149,6 +152,29 @@ Warehouse,المستودع
 Type,النوع
 Total Qty,إجمالي الكمية
 Available QTY,الكمية المتاحة
+Stock QTY,كمية المخزون
+qty,الكمية
+Nothing to save,لا يوجد شيء للحفظ
+Error saving the current invoice,خطأ في حفظ الفاتورة الحالية
+"This would cancel and delete the current sale. To save it as Draft, click Save and Clear instead.",سيؤدي هذا إلى إلغاء وحذف البيع الحالي. لحفظه كمسودة، انقر على "حفظ ومسح" بدلاً من ذلك.
+Change ({0}),الباقي ({0})
+Remaining Refund ({0}),المبلغ المتبقي للاسترداد ({0})
+To Be Paid ({0}),المبلغ المستحق ({0})
+Item / Rate Discounts,خصومات الأصناف / المعدل
+Total Discount,إجمالي الخصم
+Delivery Charges Rate,معدل رسوم التوصيل
+POSA Client Request ID,رقم طلب عميل نقاط البيع
+Update Billed Amount in Delivery Note,تحديث المبلغ المفوتر في مذكرة التسليم
+Grant Commission,منح العمولة
+Rate of Stock UOM,معدل وحدة قياس المخزون
+Distributed Discount Amount,مبلغ الخصم الموزع
+ALL,الكل
+Standard Selling,البيع القياسي
+Credit Note Issued,تم إصدار إشعار الدائن
+No invoice drafts found,لم يتم العثور على مسودات فواتير
+Saved draft invoices will appear here.,ستظهر فواتير المسودة المحفوظة هنا.
+Saved drafts,المسودات المحفوظة
+Load a saved draft invoice into the active sale.,تحميل فاتورة مسودة محفوظة إلى البيع النشط.
 Create Only Sales Order,إنشاء أوامر مبيعات فقط
 Search Items,البحث عن الأصناف
 Scan with Camera,المسح بالكاميرا
@@ -232,6 +258,7 @@ To Sync,بانتظار المزامنة
 Synced,تمت المزامنة
 POS,نقاط البيع
 Awesome,الرائع
+No data available,لا توجد بيانات
 No items found,لم يتم العثور على أصناف
 No items in cart,لا توجد أصناف في السلة
 Customers not found,لم يتم العثور على عملاء
@@ -310,6 +337,7 @@ Detecting formats,جارٍ اكتشاف التنسيقات
 Device Memory,ذاكرة الجهاز
 Disable offline mode,تعطيل وضع عدم الاتصال
 Due Date,تاريخ الاستحقاق
+Encode Quantity in Barcode,ترميز الكمية في الباركود
 End current session,إنهاء الجلسة الحالية
 Error Loading Data,خطأ في تحميل البيانات
 Error accessing camera,خطأ في الوصول إلى الكاميرا
@@ -341,6 +369,8 @@ Initialize your shift with opening balances,ابدأ ورديتك بالأرصد
 Installed Applications,التطبيقات المثبتة
 Invalid closing amount,مبلغ إغلاق غير صالح
 Invoice,فاتورة
+Quote,عرض سعر
+Delivery,تسليم
 Invoice saved offline,تم حفظ الفاتورة في وضع عدم الاتصال
 Invoices,الفواتير
 Item,عنصر
@@ -389,6 +419,7 @@ Please make a payment or select an payment,يرجى إجراء الدفع أو �
 Please request phone payment or use another payment method,يرجى طلب الدفع عبر الهاتف أو استخدام طريقة دفع أخرى
 Please select a customer,يرجى اختيار عميل
 Please select a customer first,يرجى اختيار العميل أولاً
+Please select Customer first,يرجى اختيار العميل أولاً
 Please select an invoice,يرجى اختيار فاتورة
 Please set the customer's mobile number,يرجى إدخال رقم جوال العميل
 Position the QR code or barcode within the scanning area,ضع رمز QR أو الباركود داخل منطقة المسح
@@ -1827,6 +1858,7 @@ Customer Address created successfully.,تم إنشاء عنوان العميل �
 State,المحافظة
 Barcode Printing,طباعة الباركود
 No limit,بلا حد
+Filter by Currency,تصفية حسب العملة
 Filter Invoices by POS Profile,تصفية الفواتير حسب ملف نقاط البيع
 Search by Mobile,البحث برقم الهاتف
 Add new supplier,إضافة مورد جديد

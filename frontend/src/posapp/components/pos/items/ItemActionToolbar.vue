@@ -6,7 +6,7 @@
 		<v-row no-gutters align="center" justify="center" class="dynamic-spacing-sm">
 			<v-col cols="12" class="mb-2">
 				<v-select
-					:items="itemsGroup"
+					:items="itemsGroup.map((g) => ({ title: __(g), value: g }))"
 					:label="frappe._('Items Group')"
 					density="compact"
 					variant="solo"
@@ -22,7 +22,7 @@
 					color="primary"
 					:label="frappe._('Price List')"
 					hide-details
-					:model-value="activePriceList"
+					:model-value="__(activePriceList)"
 					readonly
 				></v-text-field>
 			</v-col>

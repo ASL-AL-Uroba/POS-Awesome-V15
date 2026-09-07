@@ -475,8 +475,23 @@ fixtures = [
                     "POS Invoice-posa_change_returns",
                     "POS Invoice-posa_change_returned",
                     "POS Invoice-posa_remaining_change",
+                    "Item Barcode-posa_qty",
                 ],
             ]
+        ],
+    },
+    {
+        "doctype": "Translation",
+        "filters": [
+            ["language", "=", "ar"],
+            [
+                "source_text",
+                "in",
+                [
+                    "Payment methods refreshed. Please review before proceeding.",
+                    "Item Price added for {0} in Price List {1}",
+                ],
+            ],
         ],
     },
 ]

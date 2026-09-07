@@ -212,15 +212,29 @@ export const useItemsSelectorSearch = ({
 			return;
 		}
 
+		// Decode separator-encoded quantity: {barcode}*{qty} (printed by label printer)
+		let effectiveCode = searchTerm;
+		let separatorQty: number | null = null;
+		if (!scannerInput.scaleBarcodeMatches(searchTerm)) {
+			const star = searchTerm.lastIndexOf("*");
+			if (star > 0) {
+				const n = parseInt(searchTerm.slice(star + 1), 10);
+				if (n > 0) {
+					separatorQty = n;
+					effectiveCode = searchTerm.slice(0, star);
+				}
+			}
+		}
+
 		// Derive the searchable code and detect scale barcode
-		const search = get_search(searchTerm);
-		const isScaleBarcode = scannerInput.scaleBarcodeMatches(searchTerm);
+		const search = get_search(effectiveCode);
+		const isScaleBarcode = scannerInput.scaleBarcodeMatches(effectiveCode);
 		vm.search = search;
 
-		const qty = Number(get_item_qty(searchTerm));
+		const qty = Number(get_item_qty(effectiveCode));
 		const new_item = { ...displayedItems[0] };
-		new_item.qty = flt(qty);
-		if (isScaleBarcode) {
+		new_item.qty = flt(separatorQty ?? qty);
+		if (isScaleBarcode || separatorQty !== null) {
 			new_item._barcode_qty = true;
 		}
 
@@ -229,6 +243,10 @@ export const useItemsSelectorSearch = ({
 			new_item.item_barcode.forEach((element) => {
 				if (search === element.barcode) {
 					new_item.uom = element.uom;
+					if (!isScaleBarcode && separatorQty === null && element.posa_qty > 0) {
+						new_item.qty = flt(element.posa_qty);
+						new_item._barcode_qty = true;
+					}
 					match = true;
 				}
 			});
@@ -533,7 +551,7 @@ export const useItemsSelectorSearch = ({
 			return;
 		}
 
-		if (!vm.itemsLoaded || !vm.items.length) {
+		if (!vm.itemsLoaded || !vm.items?.length) {
 			vm.get_items(true);
 		} else {
 			vm.eventBus.emit("set_all_items", vm.items);
