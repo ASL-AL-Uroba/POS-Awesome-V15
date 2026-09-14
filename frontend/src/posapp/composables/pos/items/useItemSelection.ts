@@ -28,7 +28,6 @@ type ItemSelectionContext = {
 		| ((_source: Element, _target: Element, _config?: FlyConfig) => void)
 		| null;
 	flyConfig: FlyConfig | undefined;
-	items_view: "card" | "list";
 };
 
 /**
@@ -53,7 +52,6 @@ export function useItemSelection() {
 		focusItemSearch: null,
 		fly: null, // For animation
 		flyConfig: undefined,
-		items_view: "card", // "card" or "list"
 	};
 
 	function registerContext(context: Partial<ItemSelectionContext>) {

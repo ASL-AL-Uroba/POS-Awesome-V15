@@ -334,6 +334,7 @@ import { useItemsSelectorLayoutLifecycle } from "../../../composables/pos/items/
 import { useItemsSelectorSearchInput } from "../../../composables/pos/items/useItemsSelectorSearchInput";
 import { useItemsSelectorScannerBridge } from "../../../composables/pos/items/useItemsSelectorScannerBridge";
 import { useItemsSelectorPriceListSync } from "../../../composables/pos/items/useItemsSelectorPriceListSync";
+import { useItemsSelectorViewMode } from "../../../composables/pos/items/useItemsSelectorViewMode";
 import { useItemsSelectorPanelSizing } from "../../../composables/pos/items/useItemsSelectorPanelSizing";
 import { useItemsSelectorQuantity } from "../../../composables/pos/items/useItemsSelectorQuantity";
 import { useItemsSelectorDisplayBindings } from "../../../composables/pos/items/useItemsSelectorDisplayBindings";
@@ -461,7 +462,6 @@ const {
 // 2. Local State & Settings
 const search_input = ref("");
 const first_search = ref("");
-const items_view = ref("list");
 const itemsPerPage = ref(50);
 const clearingSearch = ref(false);
 const isDragging = ref(false);
@@ -522,6 +522,8 @@ const flyConfig = reactive({ speed: 0.6, easing: "ease-in-out" });
 
 // 3. Computed Properties
 const pos_profile = computed(() => (itemsIntegration.posProfile.value || {}) as any);
+// Card/list default comes from the POS Profile; the toolbar toggle stays free.
+const { items_view } = useItemsSelectorViewMode({ posProfile: pos_profile });
 const usesLimitSearch = computed(() =>
 	parseBooleanSetting(pos_profile.value?.posa_use_limit_search ?? pos_profile.value?.pose_use_limit_search),
 );
