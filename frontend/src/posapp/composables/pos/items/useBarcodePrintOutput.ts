@@ -3,17 +3,21 @@ import { useToastStore } from "../../../stores/toastStore";
 import { useUIStore } from "../../../stores/uiStore";
 import { printHtmlViaQz, sendRawToQz, qzConnected, setSelectedQzPrinter } from "../../../services/qzTray";
 import { useZplGenerator, type RfidConfig } from "./useZplGenerator";
+import { buildTsplJob, renderTsplLabel, type TsplLabelSize } from "../../../utils/tsplLabel";
 import type { LabelObject } from "./useLabelDesigner";
 
 export interface PrinterProfile {
 	name: string;
 	printer_name: string;
-	printer_type: "ZPL" | "EPL" | "HTML";
+	printer_type: "ZPL" | "EPL" | "TSPL" | "HTML";
 	dpi: number;
 	ip_address?: string;
 	port?: number;
 	default_label_width?: number;
 	default_label_height?: number;
+	label_gap?: number;
+	vertical_offset?: number;
+	rotate_180?: number;
 	is_default?: number;
 	printer_group?: string;
 	rfid_enabled?: number;
@@ -242,7 +246,8 @@ export function guessSymbologyFromBarcode(barcode: string): string {
 	if (digits.length === 12) return "UPC";
 	if (digits.length === 8) return "EAN8";
 	if (digits.length === 14) return "ITF14";
-	if (/^\d+$/.test(barcode)) return "ITF";
+	// ITF can only encode an even number of digits; odd-length codes like "352" need CODE128
+	if (/^\d+$/.test(barcode) && digits.length % 2 === 0) return "ITF";
 	return "CODE128";
 }
 
@@ -349,7 +354,7 @@ export function useBarcodePrintOutput() {
 	const includeBatchSerial = ref(false);
 	const symbology = ref("auto");
 	const symbologyOptions = computed(() => ["auto", "EAN13", "EAN8", "UPC", "ITF14", "ITF", "GS1_128", "CODE128", "CODE39", "CODABAR"]);
-	const outputFormat = ref<"html" | "zpl" | "epl">("html");
+	const outputFormat = ref<"html" | "zpl" | "epl" | "tspl">("html");
 	const includeWarehouseLocation = ref(false);
 	const encodeQtyInBarcode = ref(true);
 	const printerDpi = ref<PrinterDPI>(203);
@@ -386,8 +391,8 @@ export function useBarcodePrintOutput() {
 		if (profile) {
 			if (profile.dpi) printerDpi.value = profile.dpi as PrinterDPI;
 			const ptype = (profile.printer_type || "ZPL").toLowerCase();
-			if (ptype === "zpl" || ptype === "epl") {
-				outputFormat.value = ptype as "zpl" | "epl";
+			if (ptype === "zpl" || ptype === "epl" || ptype === "tspl") {
+				outputFormat.value = ptype;
 			} else {
 				outputFormat.value = "html";
 			}
@@ -1130,10 +1135,77 @@ export function useBarcodePrintOutput() {
 		}
 	};
 
+	// TSPL labels are rendered at printer resolution in tsplLabel.ts, so the ZPL/GS1 module sizing below doesn't apply.
+	const printLabelsTspl = async (itemsToPrint: any[], printerName?: string) => {
+		const profile = selectedPrinterProfile.value;
+		const preset = parseLabelSize();
+		const size: TsplLabelSize | null =
+			profile?.default_label_width && profile?.default_label_height
+				? { widthMm: profile.default_label_width, heightMm: profile.default_label_height }
+				: preset.type === "thermal" && preset.width && preset.height
+					? { widthMm: preset.width, heightMm: preset.height }
+					: null;
+		if (!size) {
+			toastStore.show({ title: __("Select a thermal label size for TSPL printing"), color: "error" });
+			return;
+		}
+		const dataErrors = validateBarcodeData(itemsToPrint);
+		if (dataErrors.length) {
+			toastStore.show({ title: __("Barcode data error: {0}", [dataErrors[0]]), color: "error" });
+			return;
+		}
+
+		let job: Uint8Array;
+		try {
+			const labels = itemsToPrint.map((item: any) => {
+				const itemSym = getItemSymbology(item);
+				const sym = itemSym === "auto" ? guessSymbologyFromBarcode(item.barcode) : itemSym;
+				const labelsCount = Math.max(1, Math.round(Number(item.qty) || 1));
+				// same quantity-embedding rule as generatePrintContent(): one CODE128 label carrying `{barcode}*{qty}`
+				const encodeQty = encodeQtyInBarcode.value && labelsCount > 1;
+				const { format, ean128 } = getSymbologyForJsBarcode(encodeQty ? "CODE128" : sym);
+				const bitmap = renderTsplLabel(
+					{
+						name: item.item_name || item.item_code || "",
+						barcode: encodeQty ? `${String(item.barcode).trim()}*${labelsCount}` : String(item.barcode).trim(),
+						price: includePrice.value ? formatCurrency(item.price) : undefined,
+						format,
+						ean128,
+					},
+					size,
+					{ offsetMm: profile?.vertical_offset || 0 },
+				);
+				return { bitmap, copies: encodeQty ? 1 : labelsCount };
+			});
+			job = buildTsplJob(labels, size, {
+				gapMm: profile?.label_gap ?? 3,
+				direction: profile?.rotate_180 ? 0 : 1,
+			});
+		} catch (e: any) {
+			// JsBarcode throws when a value can't be encoded in the chosen symbology
+			toastStore.show({ title: __("Barcode data error: {0}", [e?.message || e]), color: "error" });
+			return;
+		}
+
+		try {
+			await sendRawToQz(job, printerName);
+			toastStore.show({ title: __("Sent to QZ Tray thermal printer"), color: "success" });
+			logPrintEvent(itemsToPrint, "QZ TSPL", "Sent");
+		} catch (e: any) {
+			toastStore.show({ title: __("QZ Tray print failed: {0}", [e?.message || e]), color: "error" });
+			logPrintEvent(itemsToPrint, "QZ TSPL", "Failed", String(e?.message || e));
+			throw e;
+		}
+	};
+
 	const printLabelsRaw = async (items: any[], printerName?: string) => {
 		if (!items.length) return;
 		const itemsToPrint = getPrintableItems(items);
 		if (!itemsToPrint.length) return;
+		if (outputFormat.value === "tspl") {
+			await printLabelsTspl(itemsToPrint, printerName);
+			return;
+		}
 		const sizeWarnings = getLabelSizeWarnings(undefined, true);
 		const compliance = getBarcodeCompliance(undefined, true);
 		if (compliance === 'unfit' || compliance === 'truncated') {

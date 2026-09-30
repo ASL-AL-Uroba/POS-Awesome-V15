@@ -17,8 +17,11 @@
   "defaults_section",
   "default_label_width",
   "default_label_height",
+  "label_gap",
   "column_break_2",
    "printer_group",
+   "vertical_offset",
+   "rotate_180",
    "rfid_section",
    "rfid_enabled",
    "rfid_tag_type",
@@ -42,7 +45,8 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Printer Type",
-   "options": "ZPL\nEPL\nHTML",
+   "options": "ZPL\nEPL\nTSPL\nHTML",
+   "description": "TSPL: TSC-compatible label printers (TSC, Sprt TL series, Xprinter). Labels are sent as raw printer commands through QZ Tray, bypassing the browser and Windows driver."
    "reqd": 1
   },
   {
@@ -94,6 +98,14 @@
    "label": "Default Label Height (mm)"
   },
   {
+   "default": "3",
+   "depends_on": "eval:doc.printer_type==\"TSPL\"",
+   "fieldname": "label_gap",
+   "fieldtype": "Float",
+   "label": "Label Gap (mm)",
+   "description": "Gap between labels on the roll. Set the height above to the label itself, excluding the gap."
+  },
+  {
    "fieldname": "column_break_2",
    "fieldtype": "Column Break"
   },
@@ -102,6 +114,22 @@
     "fieldtype": "Data",
     "label": "Printer Group",
     "description": "Printers in the same group serve as failover for each other"
+   },
+   {
+    "default": "0",
+    "depends_on": "eval:doc.printer_type==\"TSPL\"",
+    "fieldname": "vertical_offset",
+    "fieldtype": "Float",
+    "label": "Vertical Offset (mm)",
+    "description": "Fine-tune where the design lands: positive moves it down the label, negative moves it up."
+   },
+   {
+    "default": "0",
+    "depends_on": "eval:doc.printer_type==\"TSPL\"",
+    "fieldname": "rotate_180",
+    "fieldtype": "Check",
+    "label": "Rotate 180°",
+    "description": "Tick if labels come out upside down."
    },
    {
     "fieldname": "rfid_section",
@@ -150,7 +178,7 @@
   ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-05 12:00:00.000000",
+ "modified": "2026-09-30 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "POSAwesome",
  "name": "POSA Printer Profile",

@@ -153,7 +153,7 @@
 							<v-col cols="12" md="1">
 								<v-select
 									v-model="outputFormat"
-									:items="['html', 'zpl', 'epl']"
+									:items="['html', 'zpl', 'epl', 'tspl']"
 									:label="__('Output')"
 									density="compact"
 									variant="outlined"
@@ -1226,7 +1226,7 @@ const onImportFromSource = async (importedItems: any[]) => {
 const thermalPrint = async () => {
 	thermalPrinting.value = true;
 	try {
-		if (outputFormat.value === "zpl" || outputFormat.value === "epl") {
+		if (outputFormat.value !== "html") {
 			await printLabelsRawWithFailover(items.value);
 		} else {
 			await printLabelsThermalWithFailover(items.value);
