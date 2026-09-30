@@ -1058,7 +1058,9 @@ export function useBarcodePrintOutput() {
 		}
 	};
 
-	const qzThermalAvailable = computed(() => qzConnected.value);
+	// Raw label formats only work through QZ, and sendRawToQz connects on demand, so don't require a
+	// connection made beforehand from the QZ Tray Setup dialog (it's lost on every page reload).
+	const qzThermalAvailable = computed(() => qzConnected.value || outputFormat.value !== "html");
 
 	const printLabelsThermal = async (items: any[], printerName?: string) => {
 		if (!items.length) return;
@@ -1272,6 +1274,9 @@ export function useBarcodePrintOutput() {
 					}
 				}
 			}
+			// TSPL printers are exactly the ones browser printing can't drive (driver dithering makes the
+			// barcodes unscannable), so keep the QZ error toast instead of printing unusable labels.
+			if (outputFormat.value === "tspl") return;
 			toastStore.show({ title: __("Thermal printing failed — falling back to browser print"), color: "warning" });
 			printLabels(items);
 		}
