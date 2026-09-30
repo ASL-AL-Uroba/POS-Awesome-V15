@@ -46,7 +46,7 @@
    "in_list_view": 1,
    "label": "Printer Type",
    "options": "ZPL\nEPL\nTSPL\nHTML",
-   "description": "TSPL: TSC-compatible label printers (TSC, Sprt TL series, Xprinter). Labels are sent as raw printer commands through QZ Tray, bypassing the browser and Windows driver."
+   "description": "TSPL: TSC-compatible label printers (TSC, Sprt TL series, Xprinter). Labels are sent as raw printer commands through QZ Tray, bypassing the browser and Windows driver.",
    "reqd": 1
   },
   {
