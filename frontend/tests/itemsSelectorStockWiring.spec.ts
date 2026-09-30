@@ -630,4 +630,73 @@ describe("ItemsSelector stock wiring", () => {
 			context,
 		);
 	});
+
+	describe("default card view", () => {
+		const mountSelector = async () => {
+			const ItemsSelector = (await import(
+				"../src/posapp/components/pos/items/ItemsSelector.vue"
+			)).default;
+
+			const wrapper = shallowMount(ItemsSelector, {
+				global: {
+					provide: {
+						eventBus: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
+					},
+				},
+			});
+
+			await Promise.resolve();
+			await wrapper.vm.$nextTick();
+			await Promise.resolve();
+			await wrapper.vm.$nextTick();
+
+			return wrapper;
+		};
+
+		it("opens in card view when the profile enables the default card view", async () => {
+			const { useUIStore } = await import("../src/posapp/stores/uiStore");
+			useUIStore().setPosProfile({
+				name: "POS-CARD-VIEW",
+				currency: "PKR",
+				selling_price_list: "Standard Selling",
+				posa_default_card_view: 1,
+			} as any);
+
+			const wrapper = await mountSelector();
+
+			expect(wrapper.vm.items_view).toBe("card");
+		});
+
+		it("opens in list view when the profile leaves the default card view unchecked", async () => {
+			const { useUIStore } = await import("../src/posapp/stores/uiStore");
+			useUIStore().setPosProfile({
+				name: "POS-LIST-VIEW",
+				currency: "PKR",
+				selling_price_list: "Standard Selling",
+				posa_default_card_view: 0,
+			} as any);
+
+			const wrapper = await mountSelector();
+
+			expect(wrapper.vm.items_view).toBe("list");
+		});
+
+		it("keeps the toolbar toggle usable after the profile default is applied", async () => {
+			const { useUIStore } = await import("../src/posapp/stores/uiStore");
+			useUIStore().setPosProfile({
+				name: "POS-TOGGLE-VIEW",
+				currency: "PKR",
+				selling_price_list: "Standard Selling",
+				posa_default_card_view: 1,
+			} as any);
+
+			const wrapper = await mountSelector();
+			expect(wrapper.vm.items_view).toBe("card");
+
+			wrapper.vm.items_view = "list";
+			await wrapper.vm.$nextTick();
+
+			expect(wrapper.vm.items_view).toBe("list");
+		});
+	});
 });

@@ -438,17 +438,23 @@ export async function printHtmlViaQz(html: string, options: QzPrintHtmlOptions =
 	await qz.print(config, data);
 }
 
-export async function sendRawToQz(data: string, printerName?: string) {
+function bytesToBase64(bytes: Uint8Array): string {
+	let bin = "";
+	for (let i = 0; i < bytes.length; i += 0x8000) {
+		bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+	}
+	return btoa(bin);
+}
+
+export async function sendRawToQz(data: string | Uint8Array, printerName?: string) {
 	const printer = await ensureQzPrinterReady(printerName);
 
 	const config = qz.configs.create(printer);
+	// binary jobs (e.g. TSPL bitmaps) go as base64 so bytes >= 0x80 aren't re-encoded
 	const printData = [
-		{
-			type: "raw",
-			format: "command",
-			flavor: "plain",
-			data: data,
-		},
+		typeof data === "string"
+			? { type: "raw", format: "command", flavor: "plain", data }
+			: { type: "raw", format: "command", flavor: "base64", data: bytesToBase64(data) },
 	];
 
 	await qz.print(config, printData);
