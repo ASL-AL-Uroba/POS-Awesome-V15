@@ -3,12 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 const sent: { data: string | Uint8Array; printer?: string }[] = [];
+const qz = vi.hoisted(() => ({ connected: { value: true } }));
 vi.mock("../src/posapp/services/qzTray", () => ({
 	sendRawToQz: vi.fn(async (data: string | Uint8Array, printer?: string) => {
 		sent.push({ data, printer });
 	}),
 	printHtmlViaQz: vi.fn(),
-	qzConnected: { value: true },
+	qzConnected: qz.connected,
 	setSelectedQzPrinter: vi.fn(),
 }));
 
@@ -26,6 +27,7 @@ vi.mock("../src/posapp/utils/tsplLabel", async (importOriginal) => {
 });
 
 import { useBarcodePrintOutput, type PrinterProfile } from "../src/posapp/composables/pos/items/useBarcodePrintOutput";
+import { sendRawToQz } from "../src/posapp/services/qzTray";
 
 const PROFILE: PrinterProfile = {
 	name: "Label TL5X",
@@ -45,6 +47,7 @@ describe("useBarcodePrintOutput TSPL output", () => {
 	beforeEach(() => {
 		sent.length = 0;
 		rendered.length = 0;
+		qz.connected.value = true;
 		setActivePinia(createPinia());
 		vi.stubGlobal("__", (value: string) => value);
 		vi.stubGlobal("frappe", { call: vi.fn(), session: { user: "test@example.com" } });
@@ -94,5 +97,27 @@ describe("useBarcodePrintOutput TSPL output", () => {
 		const text = ascii(sent[0]!.data as Uint8Array);
 		expect(text.split("CLS\r\nBITMAP")).toHaveLength(3);
 		expect(rendered[1].content.format).toBe("EAN13");
+	});
+
+	it("enables the Thermal button for raw formats without a prior QZ connection", () => {
+		qz.connected.value = false; // e.g. after a page reload; sendRawToQz connects on click
+		const out = useBarcodePrintOutput();
+		expect(out.qzThermalAvailable.value).toBe(false); // html still needs a live connection
+
+		const raw = useBarcodePrintOutput();
+		raw.applyPrinterProfile(PROFILE);
+		expect(raw.qzThermalAvailable.value).toBe(true);
+	});
+
+	it("shows the QZ error instead of falling back to browser print for TSPL", async () => {
+		vi.mocked(sendRawToQz).mockRejectedValueOnce(new Error("QZ Tray is not available."));
+		const open = vi.spyOn(window, "open").mockReturnValue(null);
+		const out = useBarcodePrintOutput();
+		out.applyPrinterProfile(PROFILE);
+
+		await out.printLabelsRawWithFailover([{ item_code: "F35", item_name: "F35", barcode: "f35", qty: 1 }]);
+
+		expect(open).not.toHaveBeenCalled();
+		open.mockRestore();
 	});
 });
