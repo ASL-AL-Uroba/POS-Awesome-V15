@@ -112,6 +112,31 @@ describe("useItemsSelectorSearch", () => {
 		expect(vm.search).toBe("");
 	});
 
+	it("routes a {barcode}*{qty} label typed by a keyboard scanner through the scan pipeline", async () => {
+		const scannerInput = createScannerInput();
+		const resolveItemByBarcode = vi.fn((code: string) =>
+			code === "2004214780992" ? { item_code: "ITEM-001" } : null,
+		);
+		const vm = {
+			first_search: "2004214780992*4",
+			search_input: "2004214780992*4",
+			search: "",
+			search_from_scanner: false,
+			isBackgroundLoading: false,
+		};
+
+		const api = useItemsSelectorSearch({
+			getVM: () => vm,
+			scannerInput,
+			resolveItemByBarcode,
+		});
+
+		await api._performSearch();
+
+		expect(scannerInput.onBarcodeScanned).toHaveBeenCalledWith("2004214780992*4");
+		expect(vm.search).toBe("");
+	});
+
 	it("selects the highlighted item when enter is pressed in limit search mode", async () => {
 		const searchItems = vi.fn().mockResolvedValue([]);
 		const selectHighlightedItem = vi.fn();
