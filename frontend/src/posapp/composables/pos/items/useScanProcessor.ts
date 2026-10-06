@@ -367,6 +367,8 @@ export function useScanProcessor(context: ScanProcessorContext) {
 			await itemAddition.addItem(newItem, {
 				suppressNegativeWarning: true,
 				skipNotification: true,
+				// Keep focus in the search box so the next scan isn't typed into cart qty.
+				fromScanner: true,
 			});
 			logScanFlow("Item added from scanner", {
 				item_code: newItem.item_code,

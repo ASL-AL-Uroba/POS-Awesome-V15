@@ -325,7 +325,10 @@ export const useItemsSelectorSearch = ({
 
 		// The barcode index owns its memory threshold and large-catalog fallback.
 		if (typeof resolveItemByBarcode === "function") {
-			if (resolveItemByBarcode(trimmedQuery)) {
+			// Labels can carry a quantity as {barcode}*{qty}; look up the barcode part
+			// and let the scan pipeline decode the quantity from the full code.
+			const labelBarcode = /^(.+)\*\d+$/.exec(trimmedQuery)?.[1] ?? trimmedQuery;
+			if (resolveItemByBarcode(labelBarcode)) {
 				// Guard: auto-add watcher already triggered scan pipeline for this code
 				if (scannerInput?.pendingScanCode?.value === trimmedQuery) {
 					return;
