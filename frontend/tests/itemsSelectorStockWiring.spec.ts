@@ -631,6 +631,36 @@ describe("ItemsSelector stock wiring", () => {
 		);
 	});
 
+	it("keeps focus in the search box after a scanned add, but not after a click add", async () => {
+		const { useUIStore } = await import("../src/posapp/stores/uiStore");
+		useUIStore().setPosProfile({
+			name: "POS-1",
+			currency: "PKR",
+			posa_decimal_precision: 2,
+			posa_focus_cart_qty_after_item_add: 1,
+		} as any);
+
+		const ItemsSelector = (await import(
+			"../src/posapp/components/pos/items/ItemsSelector.vue"
+		)).default;
+		const emit = vi.fn();
+		const wrapper = shallowMount(ItemsSelector, {
+			global: { provide: { eventBus: { on: vi.fn(), off: vi.fn(), emit } } },
+		});
+		await wrapper.vm.$nextTick();
+		const selectorContext = itemSelectionSpies.registerContext.mock.calls.at(-1)?.[0];
+		const focusRequests = () =>
+			emit.mock.calls.filter(([event]) => event === "focus_cart_item_qty").length;
+
+		await selectorContext.addItem({ item_code: "SCANNED", qty: 1 }, { fromScanner: true });
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(focusRequests()).toBe(0);
+
+		await selectorContext.addItem({ item_code: "CLICKED", qty: 1 }, { qty: 1 });
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(focusRequests()).toBe(1);
+	});
+
 	describe("default card view", () => {
 		const mountSelector = async () => {
 			const ItemsSelector = (await import(
