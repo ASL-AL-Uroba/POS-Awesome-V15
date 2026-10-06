@@ -1035,6 +1035,7 @@ const add_item = async (item, optionsOrQty: any = {}) => {
 				emit("item-added", addedLine, options.alternateSelection || null);
 			} else if (
 				addedLine &&
+				!options.fromScanner &&
 				shouldFocusCartQtyAfterItemAdd(pos_profile.value) &&
 				eventBus &&
 				typeof eventBus.emit === "function"

@@ -281,4 +281,20 @@ describe("useScanProcessor serial scan handling", () => {
 		expect(addedItem.rate).toBe(120);
 		expect(addedItem.conversion_factor).toBe(12);
 	});
+
+	it("adds a {barcode}*{qty} label with its quantity and marks the add as a scan", async () => {
+		const ctx = makeContext();
+		const item = createScannableItem({ barcode: "2004214780992" });
+		ctx.barcodeIndex.lookupItemByBarcode = vi.fn((code: string) =>
+			code === "2004214780992" ? item : null,
+		);
+
+		const { processScannedItem } = useScanProcessor(ctx as any);
+		await processScannedItem("2004214780992*4");
+
+		expect(ctx.itemAddition.addItem).toHaveBeenCalledTimes(1);
+		const [addedItem, options] = ctx.itemAddition.addItem.mock.calls[0];
+		expect(addedItem.qty).toBe(4);
+		expect(options).toMatchObject({ fromScanner: true });
+	});
 });
